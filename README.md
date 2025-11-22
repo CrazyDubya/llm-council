@@ -10,14 +10,18 @@ UIUX wise, the app looks like ChatGPT. Meaning there is a sidebar on the left st
 
 The life of a single conversation looks as follows. The user writes up a query. Then:
 
-1. Stage 1: first opinions. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them.
-2. Stage 2: review. Each individual LLM is given the responses of the other LLMs. The LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
-3. Stage 3: final response. The designated Chairman of the LLM Council (the strongest model) takes all of the model's responses and compiles them into a single final answer that is presented to the user.
+1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them.
+2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. The LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
+3. **Stage 3: Final response**. The designated Chairman of the LLM Council (the strongest model) takes all of the model's responses and compiles them into a single final answer that is presented to the user.
 
 Implementation details:
 
 - The project uses [uv](https://docs.astral.sh/uv/) for project management.
 - The project uses [OpenRouter](https://openrouter.ai/) to easily call models across all API providers with a single API key. The API key is stored in `.env` file in current repo.
+
+## Vibe Code Alert
+
+This project was 99% vibe coded as a fun Saturday hack because I wanted to explore and evaluate a number of LLMs side by side in the process of [reading books together with LLMs](https://x.com/karpathy/status/1990577951671509438). It's nice and useful to see multiple responses side by side, and also the cross-opinions of all LLMs on each other's outputs. I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
 
 ## Setup
 
