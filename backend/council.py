@@ -255,6 +255,44 @@ def calculate_aggregate_rankings(
     return aggregate
 
 
+async def generate_conversation_title(user_query: str) -> str:
+    """
+    Generate a short title for a conversation based on the first user message.
+
+    Args:
+        user_query: The first user message
+
+    Returns:
+        A short title (3-5 words)
+    """
+    title_prompt = f"""Generate a very short title (3-5 words maximum) that summarizes the following question.
+The title should be concise and descriptive. Do not use quotes or punctuation in the title.
+
+Question: {user_query}
+
+Title:"""
+
+    messages = [{"role": "user", "content": title_prompt}]
+
+    # Use gemini-2.5-flash for title generation (fast and cheap)
+    response = await query_model("google/gemini-2.5-flash", messages, timeout=30.0)
+
+    if response is None:
+        # Fallback to a generic title
+        return "New Conversation"
+
+    title = response.get('content', 'New Conversation').strip()
+
+    # Clean up the title - remove quotes, limit length
+    title = title.strip('"\'')
+
+    # Truncate if too long
+    if len(title) > 50:
+        title = title[:47] + "..."
+
+    return title
+
+
 async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.

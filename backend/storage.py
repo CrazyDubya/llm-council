@@ -33,6 +33,7 @@ def create_conversation(conversation_id: str) -> Dict[str, Any]:
     conversation = {
         "id": conversation_id,
         "created_at": datetime.utcnow().isoformat(),
+        "title": "New Conversation",
         "messages": []
     }
 
@@ -96,6 +97,7 @@ def list_conversations() -> List[Dict[str, Any]]:
                 conversations.append({
                     "id": data["id"],
                     "created_at": data["created_at"],
+                    "title": data.get("title", "New Conversation"),
                     "message_count": len(data["messages"])
                 })
 
@@ -151,4 +153,20 @@ def add_assistant_message(
         "stage3": stage3
     })
 
+    save_conversation(conversation)
+
+
+def update_conversation_title(conversation_id: str, title: str):
+    """
+    Update the title of a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+        title: New title for the conversation
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    conversation["title"] = title
     save_conversation(conversation)

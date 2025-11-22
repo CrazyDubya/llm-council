@@ -29,7 +29,7 @@ export default function Sidebar({
               onClick={() => onSelectConversation(conv.id)}
             >
               <div className="conversation-title">
-                Conversation {conv.id.slice(0, 8)}...
+                {conv.title || 'New Conversation'}
               </div>
               <div className="conversation-meta">
                 {conv.message_count} messages
