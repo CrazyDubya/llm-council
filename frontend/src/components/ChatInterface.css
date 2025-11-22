@@ -71,6 +71,20 @@
   font-size: 14px;
 }
 
+.stage-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+}
+
 .spinner {
   width: 20px;
   height: 20px;

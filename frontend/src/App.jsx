@@ -69,33 +69,114 @@ function App() {
         messages: [...prev.messages, userMessage],
       }));
 
-      // Send message and get council response
-      const response = await api.sendMessage(currentConversationId, content);
-
-      // Add assistant message to UI
+      // Create a partial assistant message that will be updated progressively
       const assistantMessage = {
         role: 'assistant',
-        stage1: response.stage1,
-        stage2: response.stage2,
-        stage3: response.stage3,
-        metadata: response.metadata,
+        stage1: null,
+        stage2: null,
+        stage3: null,
+        metadata: null,
+        loading: {
+          stage1: false,
+          stage2: false,
+          stage3: false,
+        },
       };
 
+      // Add the partial assistant message
       setCurrentConversation((prev) => ({
         ...prev,
         messages: [...prev.messages, assistantMessage],
       }));
 
-      // Reload conversations list to update message count
-      await loadConversations();
+      // Send message with streaming
+      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+        switch (eventType) {
+          case 'stage1_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.stage1 = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'stage1_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.stage1 = event.data;
+              lastMsg.loading.stage1 = false;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'stage2_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.stage2 = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'stage2_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.stage2 = event.data;
+              lastMsg.metadata = event.metadata;
+              lastMsg.loading.stage2 = false;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'stage3_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.loading.stage3 = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'stage3_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.stage3 = event.data;
+              lastMsg.loading.stage3 = false;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'title_complete':
+            // Reload conversations to get updated title
+            loadConversations();
+            break;
+
+          case 'complete':
+            // Stream complete, reload conversations list
+            loadConversations();
+            setIsLoading(false);
+            break;
+
+          case 'error':
+            console.error('Stream error:', event.message);
+            setIsLoading(false);
+            break;
+
+          default:
+            console.log('Unknown event type:', eventType);
+        }
+      });
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Remove optimistic user message on error
+      // Remove optimistic messages on error
       setCurrentConversation((prev) => ({
         ...prev,
-        messages: prev.messages.slice(0, -1),
+        messages: prev.messages.slice(0, -2),
       }));
-    } finally {
       setIsLoading(false);
     }
   };

@@ -71,13 +71,39 @@ export default function ChatInterface({
               ) : (
                 <div className="assistant-message">
                   <div className="message-label">LLM Council</div>
-                  <Stage1 responses={msg.stage1} />
-                  <Stage2
-                    rankings={msg.stage2}
-                    labelToModel={msg.metadata?.label_to_model}
-                    aggregateRankings={msg.metadata?.aggregate_rankings}
-                  />
-                  <Stage3 finalResponse={msg.stage3} />
+
+                  {/* Stage 1 */}
+                  {msg.loading?.stage1 && (
+                    <div className="stage-loading">
+                      <div className="spinner"></div>
+                      <span>Running Stage 1: Collecting individual responses...</span>
+                    </div>
+                  )}
+                  {msg.stage1 && <Stage1 responses={msg.stage1} />}
+
+                  {/* Stage 2 */}
+                  {msg.loading?.stage2 && (
+                    <div className="stage-loading">
+                      <div className="spinner"></div>
+                      <span>Running Stage 2: Peer rankings...</span>
+                    </div>
+                  )}
+                  {msg.stage2 && (
+                    <Stage2
+                      rankings={msg.stage2}
+                      labelToModel={msg.metadata?.label_to_model}
+                      aggregateRankings={msg.metadata?.aggregate_rankings}
+                    />
+                  )}
+
+                  {/* Stage 3 */}
+                  {msg.loading?.stage3 && (
+                    <div className="stage-loading">
+                      <div className="spinner"></div>
+                      <span>Running Stage 3: Final synthesis...</span>
+                    </div>
+                  )}
+                  {msg.stage3 && <Stage3 finalResponse={msg.stage3} />}
                 </div>
               )}
             </div>
@@ -94,24 +120,26 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      <form className="input-form" onSubmit={handleSubmit}>
-        <textarea
-          className="message-input"
-          placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          rows={3}
-        />
-        <button
-          type="submit"
-          className="send-button"
-          disabled={!input.trim() || isLoading}
-        >
-          Send
-        </button>
-      </form>
+      {conversation.messages.length === 0 && (
+        <form className="input-form" onSubmit={handleSubmit}>
+          <textarea
+            className="message-input"
+            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            rows={3}
+          />
+          <button
+            type="submit"
+            className="send-button"
+            disabled={!input.trim() || isLoading}
+          >
+            Send
+          </button>
+        </form>
+      )}
     </div>
   );
 }
