@@ -2,6 +2,8 @@
 
 ![llmcouncil](header.jpg)
 
+> **Fork Notice**: This is an enhanced fork of [Karpathy's LLM Council](https://github.com/karpathy/llm-council), which was originally created as a "fun Saturday hack" to evaluate multiple LLMs side by side. This fork extends the original single-strategy prototype into a full ensemble strategy playground with analytics, multi-round deliberation, and intelligent strategy selection.
+
 The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, etc.), you can group them into your "LLM Council" and let them collaborate through various deliberation strategies. This is a local web app that uses OpenRouter to orchestrate multi-model deliberation.
 
 ## What's New in v0.2
@@ -15,6 +17,32 @@ The idea of this repo is that instead of asking a question to your favorite LLM 
 - 🔄 **Multi-Round Deliberation**: Models iteratively refine their answers based on peer feedback
 - 🧠 **Reasoning-Aware Evaluation**: Special handling for models that show their work (o1, DeepSeek-R1)
 - ⚖️ **Performance-Weighted Voting**: Better models get more influence in the final ranking
+
+## What This Fork Adds
+
+Building on Karpathy's elegant 3-stage council architecture, this fork adds:
+
+### Advanced Deliberation
+- **Multiple Strategy Patterns**: Beyond simple ranking, now includes multi-round iterative deliberation, reasoning-aware evaluation for thinking models, and performance-weighted voting
+- **Strategy Recommendation Engine**: AI-powered query classification to automatically suggest optimal strategy
+- **A/B Testing Framework**: Compare multiple strategies on the same query to validate effectiveness
+
+### Analytics & Learning
+- **Performance Tracking**: Persistent analytics on model win rates, average rankings, and strategy effectiveness
+- **User Feedback Loop**: 👍/👎 ratings improve future strategy recommendations
+- **Analytics Dashboard**: Visual leaderboard and metrics across all conversations
+
+### Extended Testing & Documentation
+- **Comprehensive Test Suite**: Unit tests for strategies, classifiers, analytics engine, and OpenRouter integration
+- **Real-World Validation**: Testing guide documenting scenarios from factual lookups to complex reasoning tasks
+- **Technical Documentation**: Detailed architecture docs (`CLAUDE_v02.md`) for maintainers
+
+### Preserved from Original
+- ✅ Clean, minimal codebase philosophy ("vibe code")
+- ✅ Local-first web app with JSON storage
+- ✅ OpenRouter integration for easy multi-provider access
+- ✅ Anonymous peer review to prevent bias
+- ✅ Tab-based UI for inspecting all raw outputs
 
 ## How It Works
 
@@ -32,7 +60,11 @@ The idea of this repo is that instead of asking a question to your favorite LLM 
 
 ## Vibe Code Alert
 
-This project was 99% vibe coded as a fun Saturday hack because I wanted to explore and evaluate a number of LLMs side by side in the process of [reading books together with LLMs](https://x.com/karpathy/status/1990577951671509438). It's nice and useful to see multiple responses side by side, and also the cross-opinions of all LLMs on each other's outputs. I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
+**From the original author (Karpathy):**
+
+> This project was 99% vibe coded as a fun Saturday hack because I wanted to explore and evaluate a number of LLMs side by side in the process of [reading books together with LLMs](https://x.com/karpathy/status/1990577951671509438). It's nice and useful to see multiple responses side by side, and also the cross-opinions of all LLMs on each other's outputs. I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
+
+**This fork** continues in that spirit while adding structure for those who want to experiment with ensemble strategies. The code remains readable and hackable—feel free to modify it with your favorite LLM!
 
 ## Setup
 
@@ -144,5 +176,26 @@ The backend exposes a REST API (see `CLAUDE_v02.md` for details):
 ## Documentation
 
 - **README.md** (this file): User guide and setup
+- **CLAUDE.md**: Technical notes and architectural decisions for maintainers
 - **CLAUDE_v02.md**: Complete technical documentation for v0.2 architecture
 - **V02_IMPLEMENTATION_PLAN.md**: Original implementation roadmap
+- **TEST_SETUP.md**: Comprehensive testing guide with real-world scenarios
+- **STRATEGY_ANALYSIS.md**: Performance analysis from API testing
+
+## Fork Evolution
+
+This fork evolved through several phases:
+
+1. **Phase 1**: Strategy infrastructure & pattern abstraction
+2. **Phase 2**: Multi-round deliberation implementation
+3. **Phase 3**: Analytics layer & persistent feedback
+4. **Phase 4**: Reasoning-aware evaluation for thinking models
+5. **Phase 5**: Weighted voting & query classification
+6. **Phase 6**: UI integration & documentation
+
+The original 3-stage council remains available as the "Simple Ranking" strategy, while the new strategies build upon that foundation.
+
+## Credits
+
+- **Original Concept & v0.1**: [Andrej Karpathy](https://github.com/karpathy/llm-council)
+- **v0.2 Extensions**: This fork (ensemble strategies, analytics, testing)
