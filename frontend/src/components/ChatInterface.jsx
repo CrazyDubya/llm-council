@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
+import MultiRoundView from './MultiRoundView';
 import './ChatInterface.css';
 
 export default function ChatInterface({
@@ -72,31 +73,50 @@ export default function ChatInterface({
                 <div className="assistant-message">
                   <div className="message-label">LLM Council</div>
 
-                  {/* Stage 1 */}
-                  {msg.loading?.stage1 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 1: Collecting individual responses...</span>
+                  {/* Detect if this is multi-round strategy */}
+                  {msg.stage1 && Array.isArray(msg.stage1) && msg.stage1[0]?.round_number ? (
+                    // Multi-round strategy
+                    <div className="multi-round-container">
+                      {msg.loading?.stage1 && (
+                        <div className="stage-loading">
+                          <div className="spinner"></div>
+                          <span>Running multi-round deliberation...</span>
+                        </div>
+                      )}
+                      {!msg.loading?.stage1 && (
+                        <MultiRoundView rounds={msg.stage1} metadata={msg.metadata} />
+                      )}
                     </div>
-                  )}
-                  {msg.stage1 && <Stage1 responses={msg.stage1} />}
+                  ) : (
+                    // Simple strategy
+                    <>
+                      {/* Stage 1 */}
+                      {msg.loading?.stage1 && (
+                        <div className="stage-loading">
+                          <div className="spinner"></div>
+                          <span>Running Stage 1: Collecting individual responses...</span>
+                        </div>
+                      )}
+                      {msg.stage1 && <Stage1 responses={msg.stage1} />}
 
-                  {/* Stage 2 */}
-                  {msg.loading?.stage2 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 2: Peer rankings...</span>
-                    </div>
-                  )}
-                  {msg.stage2 && (
-                    <Stage2
-                      rankings={msg.stage2}
-                      labelToModel={msg.metadata?.label_to_model}
-                      aggregateRankings={msg.metadata?.aggregate_rankings}
-                    />
+                      {/* Stage 2 */}
+                      {msg.loading?.stage2 && (
+                        <div className="stage-loading">
+                          <div className="spinner"></div>
+                          <span>Running Stage 2: Peer rankings...</span>
+                        </div>
+                      )}
+                      {msg.stage2 && (
+                        <Stage2
+                          rankings={msg.stage2}
+                          labelToModel={msg.metadata?.label_to_model}
+                          aggregateRankings={msg.metadata?.aggregate_rankings}
+                        />
+                      )}
+                    </>
                   )}
 
-                  {/* Stage 3 */}
+                  {/* Stage 3 (common to all strategies) */}
                   {msg.loading?.stage3 && (
                     <div className="stage-loading">
                       <div className="spinner"></div>

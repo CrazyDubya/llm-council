@@ -3,13 +3,14 @@ import './StrategySelector.css';
 
 function StrategySelector({ selectedStrategy, onStrategyChange }) {
   const [strategies, setStrategies] = useState({
-    simple: { name: 'Simple Ranking', description: 'Default 3-stage ranking' }
+    simple: { name: 'Simple Ranking', description: 'Default 3-stage ranking' },
+    multi_round: { name: 'Multi-Round', description: 'Iterative deliberation with 2 rounds' }
   });
 
-  // For now, we'll use a hardcoded list since we only have one strategy
-  // In the future, we can fetch from /api/strategies
+  // Strategy options (can be fetched from /api/strategies in the future)
   const strategyOptions = [
-    { id: 'simple', name: 'Simple Ranking' }
+    { id: 'simple', name: 'Simple Ranking' },
+    { id: 'multi_round', name: 'Multi-Round (2 rounds)' }
   ];
 
   return (

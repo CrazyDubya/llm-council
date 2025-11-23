@@ -3,11 +3,13 @@
 from typing import Dict
 from .base import EnsembleStrategy
 from .simple_ranking import SimpleRankingStrategy
+from .multi_round import MultiRoundStrategy
 
 
 # Registry of available strategies
 _STRATEGIES: Dict[str, type] = {
     'simple': SimpleRankingStrategy,
+    'multi_round': MultiRoundStrategy,
 }
 
 
@@ -68,6 +70,7 @@ def register_strategy(name: str, strategy_class: type):
 __all__ = [
     'EnsembleStrategy',
     'SimpleRankingStrategy',
+    'MultiRoundStrategy',
     'get_strategy',
     'list_strategies',
     'register_strategy'
