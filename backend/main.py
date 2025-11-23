@@ -51,6 +51,13 @@ class RecommendStrategyRequest(BaseModel):
     query: str
 
 
+class CompareStrategiesRequest(BaseModel):
+    """Request to compare multiple strategies on the same query."""
+    query: str
+    strategies: List[str]
+    strategy_configs: Dict[str, Dict[str, Any]] = {}
+
+
 class ConversationMetadata(BaseModel):
     """Conversation metadata for list view."""
     id: str
@@ -97,6 +104,69 @@ async def recommend_strategy(request: RecommendStrategyRequest):
         'fallback_options': recommendation.fallback_options,
         'query_category': recommendation.query_category,
         'performance_data': recommendation.performance_data
+    }
+
+
+@app.post("/api/strategies/compare")
+async def compare_strategies(request: CompareStrategiesRequest):
+    """
+    A/B test multiple strategies on the same query.
+
+    Runs the query through multiple strategies in parallel and returns
+    all results for side-by-side comparison. Useful for evaluating
+    which strategy works best for a particular type of query.
+
+    Note: This endpoint does not save results to any conversation.
+    It's purely for experimental comparison purposes.
+    """
+    # Validate strategies
+    available_strategies = list_strategies()
+    for strategy_name in request.strategies:
+        if strategy_name not in available_strategies:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown strategy '{strategy_name}'. Available: {', '.join(available_strategies.keys())}"
+            )
+
+    # Run all strategies in parallel
+    async def run_strategy(strategy_name: str):
+        try:
+            # Get config for this strategy
+            config = request.strategy_configs.get(strategy_name, {})
+
+            # Inject analytics for weighted_voting
+            if strategy_name == 'weighted_voting':
+                config = dict(config)
+                config['analytics_engine'] = analytics
+
+            # Get and execute strategy
+            strategy = get_strategy(strategy_name, config=config)
+            result = await strategy.execute(
+                query=request.query,
+                models=COUNCIL_MODELS,
+                chairman=CHAIRMAN_MODEL
+            )
+
+            return {
+                'strategy': strategy_name,
+                'success': True,
+                'result': result
+            }
+        except Exception as e:
+            return {
+                'strategy': strategy_name,
+                'success': False,
+                'error': str(e)
+            }
+
+    # Execute all strategies in parallel
+    tasks = [run_strategy(s) for s in request.strategies]
+    results = await asyncio.gather(*tasks)
+
+    return {
+        'query': request.query,
+        'comparisons': results,
+        'timestamp': asyncio.get_event_loop().time()
     }
 
 
