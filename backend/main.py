@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 import uuid
 import json
 import asyncio
+import logging
 
 from . import storage
 from .council import generate_conversation_title
@@ -17,10 +18,19 @@ from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 from .analytics import AnalyticsEngine
 from .query_classifier import QueryClassifier
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # Initialize analytics engine, query classifier, and strategy recommender
+logger.info("Initializing analytics engine and recommender system...")
 analytics = AnalyticsEngine()
 classifier = QueryClassifier()
 recommender = StrategyRecommender(classifier, analytics)
+logger.info("System initialization complete")
 
 app = FastAPI(title="LLM Council API")
 
@@ -223,15 +233,22 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
             config['analytics_engine'] = analytics
 
         strategy = get_strategy(request.strategy, config=config)
+        logger.info(f"Executing strategy: {request.strategy} for conversation: {conversation_id}")
     except ValueError as e:
+        logger.error(f"Invalid strategy: {request.strategy}")
         raise HTTPException(status_code=400, detail=str(e))
 
     # Execute the strategy
-    result = await strategy.execute(
-        query=request.content,
-        models=COUNCIL_MODELS,
-        chairman=CHAIRMAN_MODEL
-    )
+    try:
+        result = await strategy.execute(
+            query=request.content,
+            models=COUNCIL_MODELS,
+            chairman=CHAIRMAN_MODEL
+        )
+        logger.info(f"Strategy execution complete: {request.strategy}")
+    except Exception as e:
+        logger.error(f"Strategy execution failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Strategy execution failed")
 
     # Add assistant message with all stages and metadata
     storage.add_assistant_message(
@@ -413,6 +430,8 @@ async def update_feedback(
             message_index,
             request.feedback
         )
+        # Invalidate analytics cache since feedback affects recommendations
+        analytics.invalidate_cache()
         return {"status": "success"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

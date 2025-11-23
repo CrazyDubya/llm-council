@@ -17,9 +17,18 @@ class AnalyticsEngine:
     and strategy effectiveness.
     """
 
-    def __init__(self):
+    def __init__(self, cache_ttl_seconds: int = 300):
+        """
+        Initialize analytics engine with optional caching.
+
+        Args:
+            cache_ttl_seconds: Time-to-live for cached analytics (default: 5 minutes)
+        """
         self.analytics_dir = os.path.join(DATA_DIR, 'analytics')
         self.summary_path = os.path.join(self.analytics_dir, 'summary.json')
+        self.cache_ttl_seconds = cache_ttl_seconds
+        self._cache = None
+        self._cache_timestamp = None
         Path(self.analytics_dir).mkdir(parents=True, exist_ok=True)
 
     def compute_all_analytics(self) -> Dict[str, Any]:
@@ -150,6 +159,39 @@ class AnalyticsEngine:
 
         return summary
 
+    def _is_cache_valid(self) -> bool:
+        """Check if in-memory cache is still valid."""
+        if self._cache is None or self._cache_timestamp is None:
+            return False
+
+        elapsed = (datetime.utcnow() - self._cache_timestamp).total_seconds()
+        return elapsed < self.cache_ttl_seconds
+
+    def _get_summary(self) -> Dict[str, Any]:
+        """Get analytics summary with caching."""
+        # Check in-memory cache first
+        if self._is_cache_valid():
+            return self._cache
+
+        # Try loading from disk
+        summary = self._load_summary()
+        if summary:
+            # Update cache
+            self._cache = summary
+            self._cache_timestamp = datetime.utcnow()
+            return summary
+
+        # Recompute if no valid cache or disk data
+        summary = self.compute_all_analytics()
+        self._cache = summary
+        self._cache_timestamp = datetime.utcnow()
+        return summary
+
+    def invalidate_cache(self):
+        """Force cache invalidation (call after new feedback)."""
+        self._cache = None
+        self._cache_timestamp = None
+
     def get_model_performance(self, model: str) -> Optional[Dict[str, Any]]:
         """
         Get performance metrics for a specific model.
@@ -160,10 +202,7 @@ class AnalyticsEngine:
         Returns:
             Performance metrics or None if model not found
         """
-        summary = self._load_summary()
-        if not summary:
-            summary = self.compute_all_analytics()
-
+        summary = self._get_summary()
         return summary.get('model_stats', {}).get(model)
 
     def get_strategy_performance(self, strategy: str) -> Optional[Dict[str, Any]]:
@@ -176,10 +215,7 @@ class AnalyticsEngine:
         Returns:
             Strategy metrics or None if not found
         """
-        summary = self._load_summary()
-        if not summary:
-            summary = self.compute_all_analytics()
-
+        summary = self._get_summary()
         return summary.get('strategy_stats', {}).get(strategy)
 
     def get_model_leaderboard(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -192,26 +228,25 @@ class AnalyticsEngine:
         Returns:
             List of models with performance metrics
         """
-        summary = self._load_summary()
-        if not summary:
-            summary = self.compute_all_analytics()
-
+        summary = self._get_summary()
         model_stats = summary.get('model_stats', {})
 
         # Convert to list and sort by win rate
         leaderboard = []
         for model, stats in model_stats.items():
+            total_evals = stats.get('total_evaluations', 0)
             leaderboard.append({
                 'model': model,
-                'win_rate': stats['win_rate'],
-                'wins': stats['wins'],
-                'total_evaluations': stats['total_evaluations'],
-                'avg_rank': stats['avg_rank'],
-                'top_3_rate': round(stats['top_3'] / stats['total_evaluations'], 3)
-                if stats['total_evaluations'] > 0 else 0.0
+                'win_rate': stats.get('win_rate', 0.0),
+                'wins': stats.get('wins', 0),
+                'total_evaluations': total_evals,
+                'avg_rank': stats.get('avg_rank', 0.0),
+                'top_3_rate': round(stats.get('top_3', 0) / total_evals, 3)
+                if total_evals > 0 else 0.0
             })
 
-        leaderboard.sort(key=lambda x: x['win_rate'], reverse=True)
+        # Sort by win rate first, then by total evaluations for tiebreaking
+        leaderboard.sort(key=lambda x: (x['win_rate'], x['total_evaluations']), reverse=True)
 
         return leaderboard[:limit]
 
@@ -225,10 +260,7 @@ class AnalyticsEngine:
         Returns:
             Strategy identifier
         """
-        summary = self._load_summary()
-        if not summary:
-            summary = self.compute_all_analytics()
-
+        summary = self._get_summary()
         strategy_stats = summary.get('strategy_stats', {})
 
         # Sort by average feedback (if available), otherwise by usage count

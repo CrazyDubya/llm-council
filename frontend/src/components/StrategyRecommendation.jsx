@@ -7,9 +7,13 @@ export default function StrategyRecommendation({ query, onAccept, onDismiss }) {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Only fetch recommendation if query is substantial
+    // Debounce: only fetch after user stops typing for 500ms
     if (query && query.trim().length > 20 && !dismissed) {
-      fetchRecommendation(query);
+      const timer = setTimeout(() => {
+        fetchRecommendation(query);
+      }, 500);
+
+      return () => clearTimeout(timer);
     } else {
       setRecommendation(null);
     }
@@ -26,10 +30,16 @@ export default function StrategyRecommendation({ query, onAccept, onDismiss }) {
 
       if (response.ok) {
         const data = await response.json();
-        setRecommendation(data);
+        // Only set if confidence is reasonable
+        if (data.confidence >= 0.2) {
+          setRecommendation(data);
+        }
+      } else {
+        console.warn('Recommendation request failed:', response.status);
       }
     } catch (error) {
       console.error('Failed to get strategy recommendation:', error);
+      // Silently fail - recommendation is optional enhancement
     } finally {
       setLoading(false);
     }

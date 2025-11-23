@@ -97,6 +97,14 @@ class QueryClassifier:
         Returns:
             QueryCategory with category name, confidence, and matching indicators
         """
+        # Input validation
+        if not query or len(query.strip()) < 3:
+            return QueryCategory(
+                category='factual',
+                confidence=0.0,
+                indicators=[]
+            )
+
         query_lower = query.lower()
         scores = {}
         matches = {}
