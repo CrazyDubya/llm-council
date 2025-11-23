@@ -203,6 +203,8 @@ function App() {
           conversation={currentConversation}
           onSendMessage={handleSendMessage}
           isLoading={isLoading}
+          selectedStrategy={selectedStrategy}
+          onStrategyChange={setSelectedStrategy}
         />
       </div>
 
