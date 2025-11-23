@@ -23,3 +23,57 @@
   line-height: 1.7;
   font-size: 15px;
 }
+
+.feedback-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.feedback-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.feedback-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.feedback-btn {
+  background: white;
+  border: 2px solid #ddd;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+}
+
+.feedback-btn:hover:not(:disabled) {
+  border-color: #4a90e2;
+  transform: scale(1.1);
+}
+
+.feedback-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feedback-btn.active.like {
+  border-color: #28a745;
+  background: #f0fff0;
+}
+
+.feedback-btn.active.dislike {
+  border-color: #dc3545;
+  background: #fff5f5;
+}

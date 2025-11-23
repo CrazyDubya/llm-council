@@ -13,6 +13,10 @@ from . import storage
 from .council import generate_conversation_title
 from .strategies import get_strategy, list_strategies
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .analytics import AnalyticsEngine
+
+# Initialize analytics engine
+analytics = AnalyticsEngine()
 
 app = FastAPI(title="LLM Council API")
 
@@ -225,6 +229,53 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Connection": "keep-alive",
         }
     )
+
+
+@app.get("/api/analytics/summary")
+async def get_analytics_summary():
+    """Get comprehensive analytics summary."""
+    summary = analytics.compute_all_analytics()
+    return summary
+
+
+@app.get("/api/analytics/leaderboard")
+async def get_leaderboard(limit: int = 10):
+    """
+    Get model leaderboard ranked by win rate.
+
+    Args:
+        limit: Maximum number of models to return (default: 10)
+    """
+    leaderboard = analytics.get_model_leaderboard(limit=limit)
+    return {"leaderboard": leaderboard}
+
+
+@app.get("/api/analytics/models/{model}")
+async def get_model_analytics(model: str):
+    """
+    Get performance metrics for a specific model.
+
+    Args:
+        model: Model identifier (URL-encoded)
+    """
+    performance = analytics.get_model_performance(model)
+    if performance is None:
+        raise HTTPException(status_code=404, detail=f"Model {model} not found in analytics")
+    return {"model": model, "performance": performance}
+
+
+@app.get("/api/analytics/strategies/{strategy}")
+async def get_strategy_analytics(strategy: str):
+    """
+    Get performance metrics for a specific strategy.
+
+    Args:
+        strategy: Strategy identifier
+    """
+    performance = analytics.get_strategy_performance(strategy)
+    if performance is None:
+        raise HTTPException(status_code=404, detail=f"Strategy {strategy} not found in analytics")
+    return {"strategy": strategy, "performance": performance}
 
 
 class FeedbackRequest(BaseModel):

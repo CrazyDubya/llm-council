@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import StrategySelector from './components/StrategySelector';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { api } from './api';
 import './App.css';
 
@@ -11,6 +12,7 @@ function App() {
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState('simple');
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   // Load conversations on mount
   useEffect(() => {
@@ -190,6 +192,7 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onShowAnalytics={() => setShowAnalytics(true)}
       />
       <div className="main-content">
         <StrategySelector
@@ -202,6 +205,11 @@ function App() {
           isLoading={isLoading}
         />
       </div>
+
+      {/* Analytics Dashboard Modal */}
+      {showAnalytics && (
+        <AnalyticsDashboard onClose={() => setShowAnalytics(false)} />
+      )}
     </div>
   );
 }
