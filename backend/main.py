@@ -12,11 +12,15 @@ import asyncio
 from . import storage
 from .council import generate_conversation_title
 from .strategies import get_strategy, list_strategies
+from .strategies.recommender import StrategyRecommender
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 from .analytics import AnalyticsEngine
+from .query_classifier import QueryClassifier
 
-# Initialize analytics engine
+# Initialize analytics engine, query classifier, and strategy recommender
 analytics = AnalyticsEngine()
+classifier = QueryClassifier()
+recommender = StrategyRecommender(classifier, analytics)
 
 app = FastAPI(title="LLM Council API")
 
@@ -40,6 +44,11 @@ class SendMessageRequest(BaseModel):
     content: str
     strategy: str = "simple"  # Default to simple strategy
     strategy_config: Dict[str, Any] = {}
+
+
+class RecommendStrategyRequest(BaseModel):
+    """Request to get strategy recommendation for a query."""
+    query: str
 
 
 class ConversationMetadata(BaseModel):
@@ -68,6 +77,27 @@ async def root():
 async def get_strategies():
     """List all available ensemble strategies."""
     return list_strategies()
+
+
+@app.post("/api/strategies/recommend")
+async def recommend_strategy(request: RecommendStrategyRequest):
+    """
+    Recommend the best ensemble strategy based on query classification
+    and historical performance data.
+
+    Analyzes the query content to determine its type (technical, analytical, etc.)
+    and combines this with historical performance data to suggest the optimal strategy.
+    """
+    recommendation = recommender.recommend(request.query)
+
+    return {
+        'strategy': recommendation.strategy,
+        'confidence': recommendation.confidence,
+        'explanation': recommendation.explanation,
+        'fallback_options': recommendation.fallback_options,
+        'query_category': recommendation.query_category,
+        'performance_data': recommendation.performance_data
+    }
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
