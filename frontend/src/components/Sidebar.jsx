@@ -6,14 +6,20 @@ export default function Sidebar({
   currentConversationId,
   onSelectConversation,
   onNewConversation,
+  onShowAnalytics,
 }) {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
         <h1>LLM Council</h1>
-        <button className="new-conversation-btn" onClick={onNewConversation}>
-          + New Conversation
-        </button>
+        <div className="sidebar-buttons">
+          <button className="analytics-btn" onClick={onShowAnalytics} title="View Analytics">
+            📊
+          </button>
+          <button className="new-conversation-btn" onClick={onNewConversation}>
+            + New
+          </button>
+        </div>
       </div>
 
       <div className="conversation-list">

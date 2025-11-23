@@ -18,8 +18,29 @@
   color: #333;
 }
 
+.sidebar-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.analytics-btn {
+  padding: 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.analytics-btn:hover {
+  border-color: #4a90e2;
+  background: #f5f9ff;
+}
+
 .new-conversation-btn {
-  width: 100%;
+  flex: 1;
   padding: 10px;
   background: #4a90e2;
   border: 1px solid #4a90e2;

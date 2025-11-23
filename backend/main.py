@@ -8,9 +8,29 @@ from typing import List, Dict, Any
 import uuid
 import json
 import asyncio
+import logging
 
 from . import storage
-from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .council import generate_conversation_title
+from .strategies import get_strategy, list_strategies
+from .strategies.recommender import StrategyRecommender
+from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .analytics import AnalyticsEngine
+from .query_classifier import QueryClassifier
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Initialize analytics engine, query classifier, and strategy recommender
+logger.info("Initializing analytics engine and recommender system...")
+analytics = AnalyticsEngine()
+classifier = QueryClassifier()
+recommender = StrategyRecommender(classifier, analytics)
+logger.info("System initialization complete")
 
 app = FastAPI(title="LLM Council API")
 
@@ -32,6 +52,20 @@ class CreateConversationRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
+    strategy: str = "simple"  # Default to simple strategy
+    strategy_config: Dict[str, Any] = {}
+
+
+class RecommendStrategyRequest(BaseModel):
+    """Request to get strategy recommendation for a query."""
+    query: str
+
+
+class CompareStrategiesRequest(BaseModel):
+    """Request to compare multiple strategies on the same query."""
+    query: str
+    strategies: List[str]
+    strategy_configs: Dict[str, Dict[str, Any]] = {}
 
 
 class ConversationMetadata(BaseModel):
@@ -54,6 +88,96 @@ class Conversation(BaseModel):
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/api/strategies")
+async def get_strategies():
+    """List all available ensemble strategies."""
+    return list_strategies()
+
+
+@app.post("/api/strategies/recommend")
+async def recommend_strategy(request: RecommendStrategyRequest):
+    """
+    Recommend the best ensemble strategy based on query classification
+    and historical performance data.
+
+    Analyzes the query content to determine its type (technical, analytical, etc.)
+    and combines this with historical performance data to suggest the optimal strategy.
+    """
+    recommendation = recommender.recommend(request.query)
+
+    return {
+        'strategy': recommendation.strategy,
+        'confidence': recommendation.confidence,
+        'explanation': recommendation.explanation,
+        'fallback_options': recommendation.fallback_options,
+        'query_category': recommendation.query_category,
+        'performance_data': recommendation.performance_data
+    }
+
+
+@app.post("/api/strategies/compare")
+async def compare_strategies(request: CompareStrategiesRequest):
+    """
+    A/B test multiple strategies on the same query.
+
+    Runs the query through multiple strategies in parallel and returns
+    all results for side-by-side comparison. Useful for evaluating
+    which strategy works best for a particular type of query.
+
+    Note: This endpoint does not save results to any conversation.
+    It's purely for experimental comparison purposes.
+    """
+    # Validate strategies
+    available_strategies = list_strategies()
+    for strategy_name in request.strategies:
+        if strategy_name not in available_strategies:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown strategy '{strategy_name}'. Available: {', '.join(available_strategies.keys())}"
+            )
+
+    # Run all strategies in parallel
+    async def run_strategy(strategy_name: str):
+        try:
+            # Get config for this strategy
+            config = request.strategy_configs.get(strategy_name, {})
+
+            # Inject analytics for weighted_voting
+            if strategy_name == 'weighted_voting':
+                config = dict(config)
+                config['analytics_engine'] = analytics
+
+            # Get and execute strategy
+            strategy = get_strategy(strategy_name, config=config)
+            result = await strategy.execute(
+                query=request.query,
+                models=COUNCIL_MODELS,
+                chairman=CHAIRMAN_MODEL
+            )
+
+            return {
+                'strategy': strategy_name,
+                'success': True,
+                'result': result
+            }
+        except Exception as e:
+            return {
+                'strategy': strategy_name,
+                'success': False,
+                'error': str(e)
+            }
+
+    # Execute all strategies in parallel
+    tasks = [run_strategy(s) for s in request.strategies]
+    results = await asyncio.gather(*tasks)
+
+    return {
+        'query': request.query,
+        'comparisons': results,
+        'timestamp': asyncio.get_event_loop().time()
+    }
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
@@ -101,25 +225,46 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         title = await generate_conversation_title(request.content)
         storage.update_conversation_title(conversation_id, title)
 
-    # Run the 3-stage council process
-    stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content
-    )
+    # Get the requested strategy
+    try:
+        # Inject analytics engine for strategies that need it
+        config = dict(request.strategy_config)  # Copy to avoid mutation
+        if request.strategy == 'weighted_voting':
+            config['analytics_engine'] = analytics
 
-    # Add assistant message with all stages
+        strategy = get_strategy(request.strategy, config=config)
+        logger.info(f"Executing strategy: {request.strategy} for conversation: {conversation_id}")
+    except ValueError as e:
+        logger.error(f"Invalid strategy: {request.strategy}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Execute the strategy
+    try:
+        result = await strategy.execute(
+            query=request.content,
+            models=COUNCIL_MODELS,
+            chairman=CHAIRMAN_MODEL
+        )
+        logger.info(f"Strategy execution complete: {request.strategy}")
+    except Exception as e:
+        logger.error(f"Strategy execution failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Strategy execution failed")
+
+    # Add assistant message with all stages and metadata
     storage.add_assistant_message(
         conversation_id,
-        stage1_results,
-        stage2_results,
-        stage3_result
+        result['stage1'],
+        result['stage2'],
+        result['stage3'],
+        metadata=result['metadata']
     )
 
     # Return the complete response with metadata
     return {
-        "stage1": stage1_results,
-        "stage2": stage2_results,
-        "stage3": stage3_result,
-        "metadata": metadata
+        "stage1": result['stage1'],
+        "stage2": result['stage2'],
+        "stage3": result['stage3'],
+        "metadata": result['metadata']
     }
 
 
@@ -128,6 +273,9 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     """
     Send a message and stream the 3-stage council process.
     Returns Server-Sent Events as each stage completes.
+
+    Note: Currently only supports 'simple' strategy in streaming mode.
+    For other strategies, use the non-streaming endpoint.
     """
     # Check if conversation exists
     conversation = storage.get_conversation(conversation_id)
@@ -136,6 +284,13 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
+
+    # For now, streaming only supports simple strategy
+    if request.strategy != "simple":
+        raise HTTPException(
+            status_code=400,
+            detail="Streaming mode currently only supports 'simple' strategy. Use non-streaming endpoint for other strategies."
+        )
 
     async def event_generator():
         try:
@@ -147,21 +302,29 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
-            # Stage 1: Collect responses
+            # Get strategy and execute with streaming
+            # Inject analytics engine for strategies that need it
+            config = dict(request.strategy_config)  # Copy to avoid mutation
+            if request.strategy == 'weighted_voting':
+                config['analytics_engine'] = analytics
+
+            strategy = get_strategy(request.strategy, config=config)
+
+            # Execute strategy (non-streaming for now - future: support streaming in strategy interface)
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content)
-            yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
+            result = await strategy.execute(
+                query=request.content,
+                models=COUNCIL_MODELS,
+                chairman=CHAIRMAN_MODEL
+            )
 
-            # Stage 2: Collect rankings
+            yield f"data: {json.dumps({'type': 'stage1_complete', 'data': result['stage1']})}\n\n"
+
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results)
-            aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': result['stage2'], 'metadata': result['metadata']})}\n\n"
 
-            # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results)
-            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage3_complete', 'data': result['stage3']})}\n\n"
 
             # Wait for title generation if it was started
             if title_task:
@@ -169,12 +332,13 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 storage.update_conversation_title(conversation_id, title)
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
-            # Save complete assistant message
+            # Save complete assistant message with metadata
             storage.add_assistant_message(
                 conversation_id,
-                stage1_results,
-                stage2_results,
-                stage3_result
+                result['stage1'],
+                result['stage2'],
+                result['stage3'],
+                metadata=result['metadata']
             )
 
             # Send completion event
@@ -192,6 +356,85 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Connection": "keep-alive",
         }
     )
+
+
+@app.get("/api/analytics/summary")
+async def get_analytics_summary():
+    """Get comprehensive analytics summary."""
+    summary = analytics.compute_all_analytics()
+    return summary
+
+
+@app.get("/api/analytics/leaderboard")
+async def get_leaderboard(limit: int = 10):
+    """
+    Get model leaderboard ranked by win rate.
+
+    Args:
+        limit: Maximum number of models to return (default: 10)
+    """
+    leaderboard = analytics.get_model_leaderboard(limit=limit)
+    return {"leaderboard": leaderboard}
+
+
+@app.get("/api/analytics/models/{model}")
+async def get_model_analytics(model: str):
+    """
+    Get performance metrics for a specific model.
+
+    Args:
+        model: Model identifier (URL-encoded)
+    """
+    performance = analytics.get_model_performance(model)
+    if performance is None:
+        raise HTTPException(status_code=404, detail=f"Model {model} not found in analytics")
+    return {"model": model, "performance": performance}
+
+
+@app.get("/api/analytics/strategies/{strategy}")
+async def get_strategy_analytics(strategy: str):
+    """
+    Get performance metrics for a specific strategy.
+
+    Args:
+        strategy: Strategy identifier
+    """
+    performance = analytics.get_strategy_performance(strategy)
+    if performance is None:
+        raise HTTPException(status_code=404, detail=f"Strategy {strategy} not found in analytics")
+    return {"strategy": strategy, "performance": performance}
+
+
+class FeedbackRequest(BaseModel):
+    """Request to update message feedback."""
+    feedback: int  # -1, 0, or 1
+
+
+@app.post("/api/conversations/{conversation_id}/messages/{message_index}/feedback")
+async def update_feedback(
+    conversation_id: str,
+    message_index: int,
+    request: FeedbackRequest
+):
+    """
+    Update user feedback for a specific message.
+
+    Args:
+        conversation_id: The conversation ID
+        message_index: Index of the message (0-based)
+        request: Feedback request with feedback value (-1, 0, 1)
+    """
+    try:
+        storage.update_message_feedback(
+            conversation_id,
+            message_index,
+            request.feedback
+        )
+        # Invalidate analytics cache since feedback affects recommendations
+        analytics.invalidate_cache()
+        return {"status": "success"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 if __name__ == "__main__":
