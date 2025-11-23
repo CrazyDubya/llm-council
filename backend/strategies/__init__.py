@@ -5,6 +5,7 @@ from .base import EnsembleStrategy
 from .simple_ranking import SimpleRankingStrategy
 from .multi_round import MultiRoundStrategy
 from .reasoning_aware import ReasoningAwareStrategy
+from .weighted_voting import WeightedVotingStrategy
 
 
 # Registry of available strategies
@@ -12,6 +13,7 @@ _STRATEGIES: Dict[str, type] = {
     'simple': SimpleRankingStrategy,
     'multi_round': MultiRoundStrategy,
     'reasoning_aware': ReasoningAwareStrategy,
+    'weighted_voting': WeightedVotingStrategy,
 }
 
 
@@ -74,6 +76,7 @@ __all__ = [
     'SimpleRankingStrategy',
     'MultiRoundStrategy',
     'ReasoningAwareStrategy',
+    'WeightedVotingStrategy',
     'get_strategy',
     'list_strategies',
     'register_strategy'

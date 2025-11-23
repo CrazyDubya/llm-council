@@ -117,7 +117,12 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Get the requested strategy
     try:
-        strategy = get_strategy(request.strategy, config=request.strategy_config)
+        # Inject analytics engine for strategies that need it
+        config = dict(request.strategy_config)  # Copy to avoid mutation
+        if request.strategy == 'weighted_voting':
+            config['analytics_engine'] = analytics
+
+        strategy = get_strategy(request.strategy, config=config)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -181,7 +186,12 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
             # Get strategy and execute with streaming
-            strategy = get_strategy(request.strategy, config=request.strategy_config)
+            # Inject analytics engine for strategies that need it
+            config = dict(request.strategy_config)  # Copy to avoid mutation
+            if request.strategy == 'weighted_voting':
+                config['analytics_engine'] = analytics
+
+            strategy = get_strategy(request.strategy, config=config)
 
             # Execute strategy (non-streaming for now - future: support streaming in strategy interface)
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
