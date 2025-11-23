@@ -131,27 +131,37 @@ def add_assistant_message(
     conversation_id: str,
     stage1: List[Dict[str, Any]],
     stage2: List[Dict[str, Any]],
-    stage3: Dict[str, Any]
+    stage3: Dict[str, Any],
+    metadata: Optional[Dict[str, Any]] = None
 ):
     """
     Add an assistant message with all 3 stages to a conversation.
 
     Args:
         conversation_id: Conversation identifier
-        stage1: List of individual model responses
+        stage1: List of individual model responses or rounds
         stage2: List of model rankings
         stage3: Final synthesized response
+        metadata: Optional metadata (strategy, rankings, execution time, etc.)
     """
     conversation = get_conversation(conversation_id)
     if conversation is None:
         raise ValueError(f"Conversation {conversation_id} not found")
 
-    conversation["messages"].append({
+    message = {
         "role": "assistant",
         "stage1": stage1,
         "stage2": stage2,
-        "stage3": stage3
-    })
+        "stage3": stage3,
+        "timestamp": datetime.utcnow().isoformat(),
+        "user_feedback": None  # -1 (dislike), 0 (neutral), 1 (like), None (no feedback yet)
+    }
+
+    # Add metadata if provided
+    if metadata:
+        message["metadata"] = metadata
+
+    conversation["messages"].append(message)
 
     save_conversation(conversation)
 
@@ -169,4 +179,37 @@ def update_conversation_title(conversation_id: str, title: str):
         raise ValueError(f"Conversation {conversation_id} not found")
 
     conversation["title"] = title
+    save_conversation(conversation)
+
+
+def update_message_feedback(
+    conversation_id: str,
+    message_index: int,
+    feedback: int
+):
+    """
+    Update user feedback for a specific message.
+
+    Args:
+        conversation_id: Conversation identifier
+        message_index: Index of the message in the conversation
+        feedback: Feedback value (-1: dislike, 0: neutral, 1: like)
+    """
+    if feedback not in [-1, 0, 1]:
+        raise ValueError("Feedback must be -1, 0, or 1")
+
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    if message_index < 0 or message_index >= len(conversation["messages"]):
+        raise ValueError(f"Invalid message index: {message_index}")
+
+    message = conversation["messages"][message_index]
+    if message["role"] != "assistant":
+        raise ValueError("Can only add feedback to assistant messages")
+
+    message["user_feedback"] = feedback
+    message["feedback_timestamp"] = datetime.utcnow().isoformat()
+
     save_conversation(conversation)

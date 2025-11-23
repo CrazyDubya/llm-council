@@ -124,12 +124,13 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
         chairman=CHAIRMAN_MODEL
     )
 
-    # Add assistant message with all stages
+    # Add assistant message with all stages and metadata
     storage.add_assistant_message(
         conversation_id,
         result['stage1'],
         result['stage2'],
-        result['stage3']
+        result['stage3'],
+        metadata=result['metadata']
     )
 
     # Return the complete response with metadata
@@ -200,12 +201,13 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
                 storage.update_conversation_title(conversation_id, title)
                 yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
-            # Save complete assistant message
+            # Save complete assistant message with metadata
             storage.add_assistant_message(
                 conversation_id,
                 result['stage1'],
                 result['stage2'],
-                result['stage3']
+                result['stage3'],
+                metadata=result['metadata']
             )
 
             # Send completion event
@@ -223,6 +225,36 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             "Connection": "keep-alive",
         }
     )
+
+
+class FeedbackRequest(BaseModel):
+    """Request to update message feedback."""
+    feedback: int  # -1, 0, or 1
+
+
+@app.post("/api/conversations/{conversation_id}/messages/{message_index}/feedback")
+async def update_feedback(
+    conversation_id: str,
+    message_index: int,
+    request: FeedbackRequest
+):
+    """
+    Update user feedback for a specific message.
+
+    Args:
+        conversation_id: The conversation ID
+        message_index: Index of the message (0-based)
+        request: Feedback request with feedback value (-1, 0, 1)
+    """
+    try:
+        storage.update_message_feedback(
+            conversation_id,
+            message_index,
+            request.feedback
+        )
+        return {"status": "success"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 if __name__ == "__main__":
