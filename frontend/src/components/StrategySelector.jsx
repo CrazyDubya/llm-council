@@ -4,13 +4,15 @@ import './StrategySelector.css';
 function StrategySelector({ selectedStrategy, onStrategyChange }) {
   const [strategies, setStrategies] = useState({
     simple: { name: 'Simple Ranking', description: 'Default 3-stage ranking' },
-    multi_round: { name: 'Multi-Round', description: 'Iterative deliberation with 2 rounds' }
+    multi_round: { name: 'Multi-Round', description: 'Iterative deliberation with 2 rounds' },
+    reasoning_aware: { name: 'Reasoning-Aware', description: 'Optimized for o1/DeepSeek models' }
   });
 
   // Strategy options (can be fetched from /api/strategies in the future)
   const strategyOptions = [
     { id: 'simple', name: 'Simple Ranking' },
-    { id: 'multi_round', name: 'Multi-Round (2 rounds)' }
+    { id: 'multi_round', name: 'Multi-Round (2 rounds)' },
+    { id: 'reasoning_aware', name: 'Reasoning-Aware (o1/DeepSeek)' }
   ];
 
   return (
