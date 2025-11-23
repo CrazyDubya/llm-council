@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
+import StrategySelector from './components/StrategySelector';
 import { api } from './api';
 import './App.css';
 
@@ -9,6 +10,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedStrategy, setSelectedStrategy] = useState('simple');
 
   // Load conversations on mount
   useEffect(() => {
@@ -89,7 +91,7 @@ function App() {
         messages: [...prev.messages, assistantMessage],
       }));
 
-      // Send message with streaming
+      // Send message with streaming (pass selected strategy)
       await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
@@ -169,7 +171,7 @@ function App() {
           default:
             console.log('Unknown event type:', eventType);
         }
-      });
+      }, selectedStrategy, {});
     } catch (error) {
       console.error('Failed to send message:', error);
       // Remove optimistic messages on error
@@ -189,11 +191,17 @@ function App() {
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
       />
-      <ChatInterface
-        conversation={currentConversation}
-        onSendMessage={handleSendMessage}
-        isLoading={isLoading}
-      />
+      <div className="main-content">
+        <StrategySelector
+          selectedStrategy={selectedStrategy}
+          onStrategyChange={setSelectedStrategy}
+        />
+        <ChatInterface
+          conversation={currentConversation}
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+        />
+      </div>
     </div>
   );
 }
