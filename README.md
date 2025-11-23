@@ -1,14 +1,34 @@
-# LLM Council
+# LLM Council v0.2 - Ensemble Strategy Playground
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, etc.), you can group them into your "LLM Council" and let them collaborate through various deliberation strategies. This is a local web app that uses OpenRouter to orchestrate multi-model deliberation.
 
-In a bit more detail, here is what happens when you submit a query:
+## What's New in v0.2
 
-1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
-2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
-3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and compiles them into a single final answer that is presented to the user.
+**Version 0.2** transforms LLM Council from a single-strategy prototype into an ensemble strategy playground:
+
+- 🎯 **4 Deliberation Strategies**: Simple ranking, multi-round deliberation, reasoning-aware (for o1/DeepSeek), and weighted voting
+- 🤖 **AI-Powered Strategy Selection**: Intelligent recommendations based on query type and historical performance
+- 📊 **Analytics Dashboard**: Track model performance, win rates, and strategy effectiveness
+- 👍 **User Feedback System**: Rate responses to improve future recommendations
+- 🔄 **Multi-Round Deliberation**: Models iteratively refine their answers based on peer feedback
+- 🧠 **Reasoning-Aware Evaluation**: Special handling for models that show their work (o1, DeepSeek-R1)
+- ⚖️ **Performance-Weighted Voting**: Better models get more influence in the final ranking
+
+## How It Works
+
+### Basic Flow (Simple Strategy)
+
+1. **Stage 1: First opinions**. The query is sent to all council models in parallel, responses are collected and displayed in tabs.
+2. **Stage 2: Peer Review**. Each model ranks the responses (anonymized to prevent bias) based on accuracy and insight.
+3. **Stage 3: Chairman Synthesis**. The designated Chairman model synthesizes all responses and rankings into a final answer.
+
+### Advanced Strategies
+
+- **Multi-Round**: After initial ranking, top-performing models' responses are shared with everyone. Models can then revise their answers based on peer work.
+- **Reasoning-Aware**: Evaluates both the quality of reasoning (logic, rigor) and final answers separately, then combines scores.
+- **Weighted Voting**: Uses historical performance data to give high-performing models more influence in rankings.
 
 ## Vibe Code Alert
 
@@ -79,9 +99,50 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
+## Features
+
+### Strategy Selection
+Choose from 4 deliberation strategies via dropdown:
+- **Simple Ranking**: Classic 3-stage approach (fastest)
+- **Multi-Round**: 2-round iterative deliberation (thorough)
+- **Reasoning-Aware**: For o1/DeepSeek models (explicit reasoning evaluation)
+- **Weighted Voting**: Analytics-driven (experts get more weight)
+
+### Smart Recommendations
+As you type a query, the system analyzes it and suggests the best strategy:
+- Technical questions → Multi-Round
+- Logic/math problems → Reasoning-Aware
+- Analytical comparisons → Weighted Voting
+- Creative/factual queries → Simple Ranking
+
+### Analytics Dashboard
+Click the 📊 icon to view:
+- Model leaderboard (win rates, average rankings)
+- Strategy effectiveness metrics
+- Usage statistics and feedback trends
+
+### User Feedback
+Rate any final answer with 👍/👎 to help improve recommendations.
+
+## API Endpoints
+
+The backend exposes a REST API (see `CLAUDE_v02.md` for details):
+
+- `POST /api/strategies/recommend` - Get strategy suggestion for a query
+- `POST /api/strategies/compare` - A/B test multiple strategies on same query
+- `GET /api/analytics/*` - Various analytics endpoints
+- `POST /api/conversations/{id}/messages/{index}/feedback` - Submit feedback
+
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
 - **Frontend:** React + Vite, react-markdown for rendering
-- **Storage:** JSON files in `data/conversations/`
+- **Storage:** JSON files in `data/conversations/` and `data/analytics/`
 - **Package Management:** uv for Python, npm for JavaScript
+- **Architecture:** Strategy pattern, analytics engine, query classifier
+
+## Documentation
+
+- **README.md** (this file): User guide and setup
+- **CLAUDE_v02.md**: Complete technical documentation for v0.2 architecture
+- **V02_IMPLEMENTATION_PLAN.md**: Original implementation roadmap
