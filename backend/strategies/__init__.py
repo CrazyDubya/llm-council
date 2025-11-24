@@ -6,6 +6,9 @@ from .simple_ranking import SimpleRankingStrategy
 from .multi_round import MultiRoundStrategy
 from .reasoning_aware import ReasoningAwareStrategy
 from .weighted_voting import WeightedVotingStrategy
+from .swot_analysis import SwotAnalysisStrategy
+from .cost_benefit import CostBenefitStrategy
+from .decision_matrix import DecisionMatrixStrategy
 
 
 # Registry of available strategies
@@ -14,6 +17,9 @@ _STRATEGIES: Dict[str, type] = {
     'multi_round': MultiRoundStrategy,
     'reasoning_aware': ReasoningAwareStrategy,
     'weighted_voting': WeightedVotingStrategy,
+    'swot': SwotAnalysisStrategy,
+    'cost_benefit': CostBenefitStrategy,
+    'decision_matrix': DecisionMatrixStrategy,
 }
 
 
@@ -77,6 +83,9 @@ __all__ = [
     'MultiRoundStrategy',
     'ReasoningAwareStrategy',
     'WeightedVotingStrategy',
+    'SwotAnalysisStrategy',
+    'CostBenefitStrategy',
+    'DecisionMatrixStrategy',
     'get_strategy',
     'list_strategies',
     'register_strategy'

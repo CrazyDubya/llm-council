@@ -1,4 +1,4 @@
-"""Simple ranking strategy - the original v0.1 approach."""
+"""SWOT Analysis strategy - structured decision framework."""
 
 import re
 from typing import List, Dict, Any, Tuple
@@ -6,22 +6,21 @@ from collections import defaultdict
 
 from .base import EnsembleStrategy
 from ..openrouter import query_models_parallel, query_model
-from ..consensus import build_consensus_map
 
 
-class SimpleRankingStrategy(EnsembleStrategy):
+class SwotAnalysisStrategy(EnsembleStrategy):
     """
-    Simple 3-stage ranking strategy:
-    1. Collect individual responses from all models
-    2. Each model ranks anonymized responses from peers
-    3. Chairman synthesizes final answer with full context
+    SWOT Analysis framework strategy:
+    1. Each model performs SWOT analysis (Strengths, Weaknesses, Opportunities, Threats)
+    2. Models evaluate each other's analyses for comprehensiveness and insight
+    3. Chairman synthesizes the best insights from all SWOTs
     """
 
     def get_name(self) -> str:
-        return "Simple Ranking"
+        return "SWOT Analysis"
 
     def get_description(self) -> str:
-        return "3-stage process: individual responses → anonymous peer ranking → chairman synthesis"
+        return "Structured framework: models analyze Strengths, Weaknesses, Opportunities, and Threats"
 
     async def execute(
         self,
@@ -29,10 +28,10 @@ class SimpleRankingStrategy(EnsembleStrategy):
         models: List[str],
         chairman: str
     ) -> Dict[str, Any]:
-        """Execute the simple ranking strategy."""
+        """Execute the SWOT analysis strategy."""
 
-        # Stage 1: Collect individual responses
-        stage1_results = await self._stage1_collect_responses(query, models)
+        # Stage 1: Collect SWOT analyses
+        stage1_results = await self._stage1_collect_swot(query, models)
 
         # If no models responded successfully, return error
         if not stage1_results:
@@ -43,11 +42,11 @@ class SimpleRankingStrategy(EnsembleStrategy):
                     "model": "error",
                     "response": "All models failed to respond. Please try again."
                 },
-                'metadata': {}
+                'metadata': {'framework': 'swot'}
             }
 
-        # Stage 2: Collect rankings
-        stage2_results, label_to_model = await self._stage2_collect_rankings(
+        # Stage 2: Evaluate SWOT analyses
+        stage2_results, label_to_model = await self._stage2_evaluate_swots(
             query, stage1_results, models
         )
 
@@ -56,23 +55,20 @@ class SimpleRankingStrategy(EnsembleStrategy):
             stage2_results, label_to_model
         )
 
-        # Stage 3: Synthesize final answer
-        stage3_result = await self._stage3_synthesize_final(
+        # Stage 3: Synthesize final SWOT
+        stage3_result = await self._stage3_synthesize_swot(
             query,
             stage1_results,
             stage2_results,
             chairman
         )
 
-        # Build consensus map from Stage 1 responses
-        consensus_map = await build_consensus_map(stage1_results)
-
         # Prepare metadata
         metadata = {
             "label_to_model": label_to_model,
             "aggregate_rankings": aggregate_rankings,
-            "strategy": "simple",
-            "consensus_map": consensus_map
+            "strategy": "swot",
+            "framework": "swot"
         }
 
         return {
@@ -82,22 +78,46 @@ class SimpleRankingStrategy(EnsembleStrategy):
             'metadata': metadata
         }
 
-    async def _stage1_collect_responses(
+    async def _stage1_collect_swot(
         self,
         user_query: str,
         models: List[str]
     ) -> List[Dict[str, Any]]:
         """
-        Stage 1: Collect individual responses from all council models.
+        Stage 1: Collect SWOT analyses from all council models.
 
         Args:
-            user_query: The user's question
+            user_query: The user's question/topic
             models: List of model identifiers
 
         Returns:
             List of dicts with 'model' and 'response' keys
         """
-        messages = [{"role": "user", "content": user_query}]
+        swot_prompt = f"""Please perform a comprehensive SWOT analysis for the following topic or question:
+
+{user_query}
+
+Provide a structured SWOT analysis covering:
+
+**STRENGTHS:**
+- List the key strengths, advantages, or positive aspects
+- What works well? What are the strong points?
+
+**WEAKNESSES:**
+- List the limitations, disadvantages, or negative aspects
+- What could be improved? What are the weak points?
+
+**OPPORTUNITIES:**
+- List potential opportunities or positive future possibilities
+- What could be leveraged? What trends favor this?
+
+**THREATS:**
+- List potential threats, risks, or challenges
+- What could go wrong? What external factors pose risks?
+
+Be specific and insightful in each category. Aim for 3-5 points per category when possible."""
+
+        messages = [{"role": "user", "content": swot_prompt}]
 
         # Query all models in parallel
         responses = await query_models_parallel(models, messages)
@@ -113,22 +133,22 @@ class SimpleRankingStrategy(EnsembleStrategy):
 
         return stage1_results
 
-    async def _stage2_collect_rankings(
+    async def _stage2_evaluate_swots(
         self,
         user_query: str,
         stage1_results: List[Dict[str, Any]],
         models: List[str]
     ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
         """
-        Stage 2: Each model ranks the anonymized responses.
+        Stage 2: Each model evaluates the SWOT analyses.
 
         Args:
             user_query: The original user query
-            stage1_results: Results from Stage 1
+            stage1_results: SWOT analyses from Stage 1
             models: List of model identifiers
 
         Returns:
-            Tuple of (rankings list, label_to_model mapping)
+            Tuple of (evaluations list, label_to_model mapping)
         """
         # Create anonymized labels for responses (Response A, Response B, etc.)
         labels = [chr(65 + i) for i in range(len(stage1_results))]  # A, B, C, ...
@@ -139,22 +159,27 @@ class SimpleRankingStrategy(EnsembleStrategy):
             for label, result in zip(labels, stage1_results)
         }
 
-        # Build the ranking prompt
+        # Build the evaluation prompt
         responses_text = "\n\n".join([
             f"Response {label}:\n{result['response']}"
             for label, result in zip(labels, stage1_results)
         ])
 
-        ranking_prompt = f"""You are evaluating different responses to the following question:
+        evaluation_prompt = f"""You are evaluating different SWOT analyses for the following topic:
 
-Question: {user_query}
+Topic: {user_query}
 
-Here are the responses from different models (anonymized):
+Here are the SWOT analyses from different models (anonymized):
 
 {responses_text}
 
 Your task:
-1. First, evaluate each response individually. For each response, explain what it does well and what it does poorly.
+1. Evaluate each SWOT analysis based on:
+   - **Comprehensiveness**: Does it cover all four categories thoroughly?
+   - **Insight**: Are the points specific, actionable, and insightful?
+   - **Balance**: Is there good balance across categories?
+   - **Relevance**: Do all points directly relate to the topic?
+
 2. Then, at the very end of your response, provide a final ranking.
 
 IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
@@ -163,22 +188,22 @@ IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
 - Each line should be: number, period, space, then ONLY the response label (e.g., "1. Response A")
 - Do not add any other text or explanations in the ranking section
 
-Example of the correct format for your ENTIRE response:
+Example format:
 
-Response A provides good detail on X but misses Y...
-Response B is accurate but lacks depth on Z...
-Response C offers the most comprehensive answer...
+Response A has strong opportunities section but weak on threats...
+Response B provides good balance across all categories...
+Response C offers the most specific and actionable points...
 
 FINAL RANKING:
 1. Response C
-2. Response A
-3. Response B
+2. Response B
+3. Response A
 
 Now provide your evaluation and ranking:"""
 
-        messages = [{"role": "user", "content": ranking_prompt}]
+        messages = [{"role": "user", "content": evaluation_prompt}]
 
-        # Get rankings from all council models in parallel
+        # Get evaluations from all council models in parallel
         responses = await query_models_parallel(models, messages)
 
         # Format results
@@ -195,7 +220,7 @@ Now provide your evaluation and ranking:"""
 
         return stage2_results, label_to_model
 
-    async def _stage3_synthesize_final(
+    async def _stage3_synthesize_swot(
         self,
         user_query: str,
         stage1_results: List[Dict[str, Any]],
@@ -203,12 +228,12 @@ Now provide your evaluation and ranking:"""
         chairman: str
     ) -> Dict[str, Any]:
         """
-        Stage 3: Chairman synthesizes final response.
+        Stage 3: Chairman synthesizes the best SWOT insights.
 
         Args:
             user_query: The original user query
-            stage1_results: Individual model responses from Stage 1
-            stage2_results: Rankings from Stage 2
+            stage1_results: Individual SWOT analyses from Stage 1
+            stage2_results: Evaluations from Stage 2
             chairman: Chairman model identifier
 
         Returns:
@@ -216,31 +241,35 @@ Now provide your evaluation and ranking:"""
         """
         # Build comprehensive context for chairman
         stage1_text = "\n\n".join([
-            f"Model: {result['model']}\nResponse: {result['response']}"
+            f"Model: {result['model']}\nSWOT Analysis: {result['response']}"
             for result in stage1_results
         ])
 
         stage2_text = "\n\n".join([
-            f"Model: {result['model']}\nRanking: {result['ranking']}"
+            f"Model: {result['model']}\nEvaluation: {result['ranking']}"
             for result in stage2_results
         ])
 
-        chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
+        chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have performed SWOT analyses on a topic, and then evaluated each other's analyses.
 
-Original Question: {user_query}
+Original Topic: {user_query}
 
-STAGE 1 - Individual Responses:
+STAGE 1 - Individual SWOT Analyses:
 {stage1_text}
 
-STAGE 2 - Peer Rankings:
+STAGE 2 - Peer Evaluations:
 {stage2_text}
 
-Your task as Chairman is to synthesize all of this information into a single, comprehensive, accurate answer to the user's original question. Consider:
-- The individual responses and their insights
-- The peer rankings and what they reveal about response quality
-- Any patterns of agreement or disagreement
+Your task as Chairman is to synthesize the best insights from all analyses into a comprehensive, final SWOT analysis.
 
-Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
+Instructions:
+1. Review all the SWOT analyses and their evaluations
+2. Identify the most insightful, specific, and relevant points from each category
+3. Produce a final SWOT analysis that represents the council's collective wisdom
+4. Ensure good balance across all four categories
+5. Remove redundancies and combine similar points where appropriate
+
+Provide the final SWOT analysis in a clear, structured format with STRENGTHS, WEAKNESSES, OPPORTUNITIES, and THREATS sections:"""
 
         messages = [{"role": "user", "content": chairman_prompt}]
 
@@ -276,7 +305,6 @@ Provide a clear, well-reasoned final answer that represents the council's collec
             if len(parts) >= 2:
                 ranking_section = parts[1]
                 # Try to extract numbered list format (e.g., "1. Response A")
-                # This pattern looks for: number, period, optional space, "Response X"
                 numbered_matches = re.findall(r'\d+\.\s*Response [A-Z]', ranking_section)
                 if numbered_matches:
                     # Extract just the "Response X" part
@@ -296,10 +324,10 @@ Provide a clear, well-reasoned final answer that represents the council's collec
         label_to_model: Dict[str, str]
     ) -> List[Dict[str, Any]]:
         """
-        Calculate aggregate rankings across all models.
+        Calculate aggregate rankings across all evaluations.
 
         Args:
-            stage2_results: Rankings from each model
+            stage2_results: Evaluations from each model
             label_to_model: Mapping from anonymous labels to model names
 
         Returns:
@@ -308,8 +336,8 @@ Provide a clear, well-reasoned final answer that represents the council's collec
         # Track positions for each model
         model_positions = defaultdict(list)
 
-        for ranking in stage2_results:
-            ranking_text = ranking['ranking']
+        for evaluation in stage2_results:
+            ranking_text = evaluation['ranking']
 
             # Parse the ranking from the structured format
             parsed_ranking = self._parse_ranking_from_text(ranking_text)
