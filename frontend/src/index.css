@@ -7,6 +7,66 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Light theme (default) */
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-hover: #f0f0f0;
+  --bg-code: #f5f5f5;
+  --sidebar-bg: #f8f8f8;
+  --active-bg: #e8f0fe;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+
+  --border-color: #e0e0e0;
+  --border-light: #eeeeee;
+
+  --primary-color: #4a90e2;
+  --primary-hover: #357abd;
+  --primary-light: rgba(74, 144, 226, 0.1);
+
+  --success-color: #27ae60;
+  --success-light: rgba(39, 174, 96, 0.1);
+
+  --error-color: #e74c3c;
+  --error-light: rgba(231, 76, 60, 0.1);
+
+  --stage3-bg: #f0fff0;
+
+  --skeleton-base: #e0e0e0;
+  --skeleton-highlight: #f0f0f0;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --bg-hover: #2a2a2a;
+  --bg-code: #2d2d2d;
+  --sidebar-bg: #1a1a1a;
+  --active-bg: #1e3a5f;
+
+  --text-primary: #e0e0e0;
+  --text-secondary: #999999;
+
+  --border-color: #333333;
+  --border-light: #2a2a2a;
+
+  --primary-color: #5a9cf0;
+  --primary-hover: #4a8ce0;
+  --primary-light: rgba(90, 156, 240, 0.15);
+
+  --success-color: #2ecc71;
+  --success-light: rgba(46, 204, 113, 0.15);
+
+  --error-color: #e74c3c;
+  --error-light: rgba(231, 76, 60, 0.15);
+
+  --stage3-bg: #1a2f1a;
+
+  --skeleton-base: #2a2a2a;
+  --skeleton-highlight: #3a3a3a;
 }
 
 * {
@@ -19,7 +79,9 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f5f5f5;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 #root {
@@ -70,7 +132,7 @@ body {
 }
 
 .markdown-content pre {
-  background: #f5f5f5;
+  background: var(--bg-code);
   padding: 12px;
   border-radius: 4px;
   overflow-x: auto;
@@ -78,7 +140,7 @@ body {
 }
 
 .markdown-content code {
-  background: #f5f5f5;
+  background: var(--bg-code);
   padding: 2px 6px;
   border-radius: 3px;
   font-family: monospace;
@@ -93,6 +155,6 @@ body {
 .markdown-content blockquote {
   margin: 0 0 12px 0;
   padding-left: 16px;
-  border-left: 4px solid #ddd;
-  color: #666;
+  border-left: 4px solid var(--border-color);
+  color: var(--text-secondary);
 }

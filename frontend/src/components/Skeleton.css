@@ -1,0 +1,79 @@
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base, #e0e0e0) 25%,
+    var(--skeleton-highlight, #f0f0f0) 50%,
+    var(--skeleton-base, #e0e0e0) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-line {
+  margin: 0;
+}
+
+.message-skeleton {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--bg-secondary, white);
+  margin-bottom: 16px;
+}
+
+.message-skeleton .skeleton-header {
+  margin-bottom: 12px;
+}
+
+.message-skeleton .skeleton-body {
+  padding: 0 4px;
+}
+
+.conversation-skeleton {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #eee);
+}
+
+.conversation-skeleton .skeleton-title {
+  margin-bottom: 8px;
+}
+
+.conversation-skeleton .skeleton-meta {
+  opacity: 0.7;
+}
+
+.response-skeleton {
+  padding: 16px;
+}
+
+.response-skeleton .skeleton-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #eee);
+}
+
+.response-skeleton .skeleton-content {
+  padding: 12px 0;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .skeleton {
+  --skeleton-base: #2a2a2a;
+  --skeleton-highlight: #3a3a3a;
+}
