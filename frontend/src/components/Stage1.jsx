@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import ConsensusMap from './ConsensusMap';
 import './Stage1.css';
 
-export default function Stage1({ responses }) {
+export default function Stage1({ responses, metadata }) {
   const [activeTab, setActiveTab] = useState(0);
 
   if (!responses || responses.length === 0) {
@@ -31,6 +32,11 @@ export default function Stage1({ responses }) {
           <ReactMarkdown>{responses[activeTab].response}</ReactMarkdown>
         </div>
       </div>
+
+      {/* Consensus Map */}
+      {metadata?.consensus_map && (
+        <ConsensusMap consensusMap={metadata.consensus_map} />
+      )}
     </div>
   );
 }

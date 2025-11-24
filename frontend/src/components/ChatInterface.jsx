@@ -100,7 +100,7 @@ export default function ChatInterface({
                           <span>Running Stage 1: Collecting individual responses...</span>
                         </div>
                       )}
-                      {msg.stage1 && <Stage1 responses={msg.stage1} />}
+                      {msg.stage1 && <Stage1 responses={msg.stage1} metadata={msg.metadata} />}
 
                       {/* Stage 2 */}
                       {msg.loading?.stage2 && (
