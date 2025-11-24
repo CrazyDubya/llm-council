@@ -19,6 +19,7 @@ from .analytics import AnalyticsEngine
 from .query_classifier import QueryClassifier
 from .websocket import connection_manager
 from .openrouter import query_model_with_streaming
+from .cache import get_cache, start_cleanup_task
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +36,13 @@ recommender = StrategyRecommender(classifier, analytics)
 logger.info("System initialization complete")
 
 app = FastAPI(title="LLM Council API")
+
+# Start cache cleanup task on startup
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on application startup."""
+    logger.info("Starting cache cleanup task...")
+    asyncio.create_task(start_cleanup_task(interval=3600))  # Clean up every hour
 
 # Enable CORS for local development
 app.add_middleware(
@@ -437,6 +445,47 @@ async def update_feedback(
         return {"status": "success"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/cache/stats")
+async def get_cache_stats():
+    """
+    Get cache statistics including hit rate, size, and performance metrics.
+
+    Returns comprehensive cache statistics for monitoring and optimization.
+    """
+    cache = get_cache()
+    stats = await cache.get_stats()
+    return stats
+
+
+@app.post("/api/cache/clear")
+async def clear_cache():
+    """
+    Clear all cached responses.
+
+    Use with caution - this will remove all cached data and require
+    fresh queries to all models.
+    """
+    cache = get_cache()
+    await cache.clear()
+    return {"status": "success", "message": "Cache cleared successfully"}
+
+
+@app.post("/api/cache/cleanup")
+async def cleanup_cache():
+    """
+    Manually trigger cleanup of expired cache entries.
+
+    Returns the number of entries removed.
+    """
+    cache = get_cache()
+    removed = await cache.cleanup_expired()
+    return {
+        "status": "success",
+        "message": f"Removed {removed} expired entries",
+        "removed_count": removed
+    }
 
 
 @app.websocket("/ws/{conversation_id}")

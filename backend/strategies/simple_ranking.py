@@ -14,6 +14,10 @@ from ..streaming_events import (
     Stage2ModelCompleteEvent, Stage2CompleteEvent,
     Stage3StartEvent, Stage3TokenEvent, Stage3CompleteEvent
 )
+from ..cache import get_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SimpleRankingStrategy(EnsembleStrategy):
@@ -36,7 +40,8 @@ class SimpleRankingStrategy(EnsembleStrategy):
         models: List[str],
         chairman: str,
         connection_manager=None,
-        conversation_id: Optional[str] = None
+        conversation_id: Optional[str] = None,
+        use_cache: bool = True
     ) -> Dict[str, Any]:
         """
         Execute the simple ranking strategy.
@@ -47,7 +52,25 @@ class SimpleRankingStrategy(EnsembleStrategy):
             chairman: Chairman model identifier
             connection_manager: Optional WebSocket connection manager for streaming
             conversation_id: Optional conversation ID for WebSocket streaming
+            use_cache: Whether to use caching (default: True)
         """
+
+        cache = get_cache()
+
+        # Check cache first (skip if streaming, as we want real-time tokens)
+        if use_cache and not (connection_manager and conversation_id):
+            cached_response = await cache.get_response(
+                query=query,
+                models=models,
+                strategy='simple',
+                strategy_config={}
+            )
+
+            if cached_response is not None:
+                logger.info(f"Cache HIT for query: {query[:50]}...")
+                return cached_response
+
+            logger.info(f"Cache MISS for query: {query[:50]}...")
 
         # Stage 1: Collect individual responses
         stage1_results = await self._stage1_collect_responses(
@@ -93,12 +116,25 @@ class SimpleRankingStrategy(EnsembleStrategy):
             "strategy": "simple"
         }
 
-        return {
+        result = {
             'stage1': stage1_results,
             'stage2': stage2_results,
             'stage3': stage3_result,
             'metadata': metadata
         }
+
+        # Store in cache (skip if streaming, as streaming responses shouldn't be cached)
+        if use_cache and not (connection_manager and conversation_id):
+            await cache.set_response(
+                query=query,
+                models=models,
+                strategy='simple',
+                response=result,
+                strategy_config={}
+            )
+            logger.info(f"Cached response for query: {query[:50]}...")
+
+        return result
 
     async def _stage1_collect_responses(
         self,
