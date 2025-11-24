@@ -1,6 +1,6 @@
 """FastAPI backend for LLM Council."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -17,6 +17,8 @@ from .strategies.recommender import StrategyRecommender
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 from .analytics import AnalyticsEngine
 from .query_classifier import QueryClassifier
+from .websocket import connection_manager
+from .openrouter import query_model_with_streaming
 
 # Configure logging
 logging.basicConfig(
@@ -435,6 +437,147 @@ async def update_feedback(
         return {"status": "success"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.websocket("/ws/{conversation_id}")
+async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
+    """
+    WebSocket endpoint for real-time streaming of council deliberations.
+
+    Clients connect to this endpoint to receive token-by-token streaming
+    of model responses as they're generated.
+
+    Args:
+        websocket: The WebSocket connection
+        conversation_id: ID of the conversation
+    """
+    await connection_manager.connect(websocket, conversation_id)
+    logger.info(f"WebSocket connection established for conversation {conversation_id}")
+
+    try:
+        while True:
+            # Wait for messages from client
+            data = await websocket.receive_json()
+
+            message_type = data.get('type')
+
+            if message_type == 'ping':
+                # Respond to ping with pong
+                await websocket.send_json({'type': 'pong'})
+
+            elif message_type == 'send_message':
+                # Handle message send request
+                query = data.get('content')
+                strategy_name = data.get('strategy', 'simple')
+                strategy_config = data.get('strategy_config', {})
+
+                # Verify conversation exists
+                conversation = storage.get_conversation(conversation_id)
+                if conversation is None:
+                    await connection_manager.send_error(
+                        f"Conversation {conversation_id} not found",
+                        conversation_id
+                    )
+                    continue
+
+                # Check if first message
+                is_first_message = len(conversation["messages"]) == 0
+
+                # Add user message
+                storage.add_user_message(conversation_id, query)
+
+                try:
+                    # Send start event
+                    await connection_manager.send_event(
+                        'council_start',
+                        {'query': query, 'strategy': strategy_name},
+                        conversation_id
+                    )
+
+                    # Generate title in background if first message
+                    title_task = None
+                    if is_first_message:
+                        title_task = asyncio.create_task(generate_conversation_title(query))
+
+                    # Get and execute strategy
+                    # For now, we'll execute without true streaming (Day 2 task)
+                    # This is just the WebSocket infrastructure setup
+                    if strategy_name == 'weighted_voting':
+                        strategy_config['analytics_engine'] = analytics
+
+                    strategy = get_strategy(strategy_name, config=strategy_config)
+
+                    # Send stage 1 start
+                    await connection_manager.send_event(
+                        'stage1_start',
+                        {},
+                        conversation_id
+                    )
+
+                    result = await strategy.execute(
+                        query=query,
+                        models=COUNCIL_MODELS,
+                        chairman=CHAIRMAN_MODEL
+                    )
+
+                    # Send results as they complete
+                    await connection_manager.send_event(
+                        'stage1_complete',
+                        {'responses': result['stage1']},
+                        conversation_id
+                    )
+
+                    await connection_manager.send_event(
+                        'stage2_complete',
+                        {'rankings': result['stage2'], 'metadata': result['metadata']},
+                        conversation_id
+                    )
+
+                    await connection_manager.send_event(
+                        'stage3_complete',
+                        {'synthesis': result['stage3']},
+                        conversation_id
+                    )
+
+                    # Wait for title if generating
+                    if title_task:
+                        title = await title_task
+                        storage.update_conversation_title(conversation_id, title)
+                        await connection_manager.send_event(
+                            'title_complete',
+                            {'title': title},
+                            conversation_id
+                        )
+
+                    # Save assistant message
+                    storage.add_assistant_message(
+                        conversation_id,
+                        result['stage1'],
+                        result['stage2'],
+                        result['stage3'],
+                        metadata=result['metadata']
+                    )
+
+                    # Send completion
+                    await connection_manager.send_completion(conversation_id)
+
+                except Exception as e:
+                    logger.error(f"Error in WebSocket message handling: {e}", exc_info=True)
+                    await connection_manager.send_error(str(e), conversation_id)
+
+            elif message_type == 'stop_generation':
+                # Handle stop generation request (future: implement cancellation)
+                await websocket.send_json({
+                    'type': 'generation_stopped',
+                    'message': 'Generation stop not yet implemented'
+                })
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for conversation {conversation_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}", exc_info=True)
+    finally:
+        await connection_manager.disconnect(websocket, conversation_id)
 
 
 if __name__ == "__main__":
