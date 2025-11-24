@@ -507,36 +507,13 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
 
                     strategy = get_strategy(strategy_name, config=strategy_config)
 
-                    # Send stage 1 start
-                    await connection_manager.send_event(
-                        'stage1_start',
-                        {},
-                        conversation_id
-                    )
-
+                    # Execute strategy with streaming support
                     result = await strategy.execute(
                         query=query,
                         models=COUNCIL_MODELS,
-                        chairman=CHAIRMAN_MODEL
-                    )
-
-                    # Send results as they complete
-                    await connection_manager.send_event(
-                        'stage1_complete',
-                        {'responses': result['stage1']},
-                        conversation_id
-                    )
-
-                    await connection_manager.send_event(
-                        'stage2_complete',
-                        {'rankings': result['stage2'], 'metadata': result['metadata']},
-                        conversation_id
-                    )
-
-                    await connection_manager.send_event(
-                        'stage3_complete',
-                        {'synthesis': result['stage3']},
-                        conversation_id
+                        chairman=CHAIRMAN_MODEL,
+                        connection_manager=connection_manager,
+                        conversation_id=conversation_id
                     )
 
                     # Wait for title if generating

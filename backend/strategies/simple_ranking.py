@@ -1,11 +1,19 @@
 """Simple ranking strategy - the original v0.1 approach."""
 
 import re
-from typing import List, Dict, Any, Tuple
+import asyncio
+from typing import List, Dict, Any, Tuple, Optional
 from collections import defaultdict
 
 from .base import EnsembleStrategy
-from ..openrouter import query_models_parallel, query_model
+from ..openrouter import query_models_parallel, query_model, query_model_streaming
+from ..streaming_events import (
+    Stage1StartEvent, Stage1ModelStartEvent, Stage1ModelTokenEvent,
+    Stage1ModelCompleteEvent, Stage1CompleteEvent,
+    Stage2StartEvent, Stage2ModelStartEvent, Stage2ModelTokenEvent,
+    Stage2ModelCompleteEvent, Stage2CompleteEvent,
+    Stage3StartEvent, Stage3TokenEvent, Stage3CompleteEvent
+)
 
 
 class SimpleRankingStrategy(EnsembleStrategy):
@@ -26,12 +34,25 @@ class SimpleRankingStrategy(EnsembleStrategy):
         self,
         query: str,
         models: List[str],
-        chairman: str
+        chairman: str,
+        connection_manager=None,
+        conversation_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Execute the simple ranking strategy."""
+        """
+        Execute the simple ranking strategy.
+
+        Args:
+            query: User's question
+            models: List of model identifiers
+            chairman: Chairman model identifier
+            connection_manager: Optional WebSocket connection manager for streaming
+            conversation_id: Optional conversation ID for WebSocket streaming
+        """
 
         # Stage 1: Collect individual responses
-        stage1_results = await self._stage1_collect_responses(query, models)
+        stage1_results = await self._stage1_collect_responses(
+            query, models, connection_manager, conversation_id
+        )
 
         # If no models responded successfully, return error
         if not stage1_results:
@@ -47,7 +68,7 @@ class SimpleRankingStrategy(EnsembleStrategy):
 
         # Stage 2: Collect rankings
         stage2_results, label_to_model = await self._stage2_collect_rankings(
-            query, stage1_results, models
+            query, stage1_results, models, connection_manager, conversation_id
         )
 
         # Calculate aggregate rankings
@@ -60,7 +81,9 @@ class SimpleRankingStrategy(EnsembleStrategy):
             query,
             stage1_results,
             stage2_results,
-            chairman
+            chairman,
+            connection_manager,
+            conversation_id
         )
 
         # Prepare metadata
@@ -80,7 +103,9 @@ class SimpleRankingStrategy(EnsembleStrategy):
     async def _stage1_collect_responses(
         self,
         user_query: str,
-        models: List[str]
+        models: List[str],
+        connection_manager=None,
+        conversation_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Stage 1: Collect individual responses from all council models.
@@ -88,23 +113,85 @@ class SimpleRankingStrategy(EnsembleStrategy):
         Args:
             user_query: The user's question
             models: List of model identifiers
+            connection_manager: Optional WebSocket connection manager for streaming
+            conversation_id: Optional conversation ID for WebSocket streaming
 
         Returns:
             List of dicts with 'model' and 'response' keys
         """
         messages = [{"role": "user", "content": user_query}]
 
-        # Query all models in parallel
-        responses = await query_models_parallel(models, messages)
+        # Send stage 1 start event
+        if connection_manager and conversation_id:
+            await connection_manager.send_event(
+                'stage1_start',
+                Stage1StartEvent.create(models)['data'],
+                conversation_id
+            )
 
-        # Format results
         stage1_results = []
-        for model, response in responses.items():
-            if response is not None:  # Only include successful responses
-                stage1_results.append({
-                    "model": model,
-                    "response": response.get('content', '')
-                })
+
+        # If streaming is enabled, stream each model's response
+        if connection_manager and conversation_id:
+            # Stream responses sequentially for better UX (show progress per model)
+            for idx, model in enumerate(models):
+                # Send model start event
+                await connection_manager.send_event(
+                    'stage1_model_start',
+                    Stage1ModelStartEvent.create(model, idx, len(models))['data'],
+                    conversation_id
+                )
+
+                try:
+                    # Stream the model's response
+                    tokens = []
+                    async for token in query_model_streaming(model, messages):
+                        tokens.append(token)
+                        # Send each token
+                        await connection_manager.send_event(
+                            'stage1_model_token',
+                            Stage1ModelTokenEvent.create(model, token, idx)['data'],
+                            conversation_id
+                        )
+
+                    # Collect full response
+                    full_response = ''.join(tokens)
+
+                    if full_response:
+                        stage1_results.append({
+                            "model": model,
+                            "response": full_response
+                        })
+
+                        # Send model complete event
+                        await connection_manager.send_event(
+                            'stage1_model_complete',
+                            Stage1ModelCompleteEvent.create(model, full_response, idx)['data'],
+                            conversation_id
+                        )
+
+                except Exception as e:
+                    print(f"Error streaming from model {model}: {e}")
+                    # Continue with other models
+
+            # Send stage 1 complete event
+            await connection_manager.send_event(
+                'stage1_complete',
+                Stage1CompleteEvent.create(stage1_results)['data'],
+                conversation_id
+            )
+
+        else:
+            # Non-streaming mode (backward compatibility)
+            responses = await query_models_parallel(models, messages)
+
+            # Format results
+            for model, response in responses.items():
+                if response is not None:
+                    stage1_results.append({
+                        "model": model,
+                        "response": response.get('content', '')
+                    })
 
         return stage1_results
 
@@ -112,7 +199,9 @@ class SimpleRankingStrategy(EnsembleStrategy):
         self,
         user_query: str,
         stage1_results: List[Dict[str, Any]],
-        models: List[str]
+        models: List[str],
+        connection_manager=None,
+        conversation_id: Optional[str] = None
     ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
         """
         Stage 2: Each model ranks the anonymized responses.
@@ -121,6 +210,8 @@ class SimpleRankingStrategy(EnsembleStrategy):
             user_query: The original user query
             stage1_results: Results from Stage 1
             models: List of model identifiers
+            connection_manager: Optional WebSocket connection manager for streaming
+            conversation_id: Optional conversation ID for WebSocket streaming
 
         Returns:
             Tuple of (rankings list, label_to_model mapping)
@@ -173,20 +264,87 @@ Now provide your evaluation and ranking:"""
 
         messages = [{"role": "user", "content": ranking_prompt}]
 
-        # Get rankings from all council models in parallel
-        responses = await query_models_parallel(models, messages)
+        # Send stage 2 start event
+        if connection_manager and conversation_id:
+            await connection_manager.send_event(
+                'stage2_start',
+                Stage2StartEvent.create(models, len(stage1_results))['data'],
+                conversation_id
+            )
 
-        # Format results
         stage2_results = []
-        for model, response in responses.items():
-            if response is not None:
-                full_text = response.get('content', '')
-                parsed = self._parse_ranking_from_text(full_text)
-                stage2_results.append({
-                    "model": model,
-                    "ranking": full_text,
-                    "parsed_ranking": parsed
-                })
+
+        # If streaming is enabled, stream rankings
+        if connection_manager and conversation_id:
+            # Stream rankings sequentially
+            for idx, model in enumerate(models):
+                # Send model start event
+                await connection_manager.send_event(
+                    'stage2_model_start',
+                    Stage2ModelStartEvent.create(model, idx, len(models))['data'],
+                    conversation_id
+                )
+
+                try:
+                    # Stream the ranking
+                    tokens = []
+                    async for token in query_model_streaming(model, messages):
+                        tokens.append(token)
+                        # Send each token
+                        await connection_manager.send_event(
+                            'stage2_model_token',
+                            Stage2ModelTokenEvent.create(model, token, idx)['data'],
+                            conversation_id
+                        )
+
+                    # Collect full ranking
+                    full_text = ''.join(tokens)
+                    parsed = self._parse_ranking_from_text(full_text)
+
+                    if full_text:
+                        stage2_results.append({
+                            "model": model,
+                            "ranking": full_text,
+                            "parsed_ranking": parsed
+                        })
+
+                        # Send model complete event
+                        await connection_manager.send_event(
+                            'stage2_model_complete',
+                            Stage2ModelCompleteEvent.create(model, full_text, parsed, idx)['data'],
+                            conversation_id
+                        )
+
+                except Exception as e:
+                    print(f"Error streaming ranking from model {model}: {e}")
+                    # Continue with other models
+
+            # Send stage 2 complete event
+            # Calculate aggregate rankings for the event
+            aggregate = self._calculate_aggregate_rankings(stage2_results, label_to_model)
+            await connection_manager.send_event(
+                'stage2_complete',
+                Stage2CompleteEvent.create(
+                    stage2_results,
+                    {"label_to_model": label_to_model, "aggregate_rankings": aggregate}
+                )['data'],
+                conversation_id
+            )
+
+        else:
+            # Non-streaming mode (backward compatibility)
+            responses = await query_models_parallel(models, messages)
+
+            # Format results
+            for model, response in responses.items():
+                if response is not None:
+                    full_text = response.get('content', '')
+                    parsed = self._parse_ranking_from_text(full_text)
+                    stage2_results.append({
+                        "model": model,
+                        "ranking": full_text,
+                        "parsed_ranking": parsed
+                    })
 
         return stage2_results, label_to_model
 
@@ -195,7 +353,9 @@ Now provide your evaluation and ranking:"""
         user_query: str,
         stage1_results: List[Dict[str, Any]],
         stage2_results: List[Dict[str, Any]],
-        chairman: str
+        chairman: str,
+        connection_manager=None,
+        conversation_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Stage 3: Chairman synthesizes final response.
@@ -205,6 +365,8 @@ Now provide your evaluation and ranking:"""
             stage1_results: Individual model responses from Stage 1
             stage2_results: Rankings from Stage 2
             chairman: Chairman model identifier
+            connection_manager: Optional WebSocket connection manager for streaming
+            conversation_id: Optional conversation ID for WebSocket streaming
 
         Returns:
             Dict with 'model' and 'response' keys
@@ -239,20 +401,66 @@ Provide a clear, well-reasoned final answer that represents the council's collec
 
         messages = [{"role": "user", "content": chairman_prompt}]
 
-        # Query the chairman model
-        response = await query_model(chairman, messages)
+        # Send stage 3 start event
+        if connection_manager and conversation_id:
+            await connection_manager.send_event(
+                'stage3_start',
+                Stage3StartEvent.create(chairman)['data'],
+                conversation_id
+            )
 
-        if response is None:
-            # Fallback if chairman fails
+        # If streaming is enabled, stream the chairman's synthesis
+        if connection_manager and conversation_id:
+            try:
+                # Stream the chairman's response
+                tokens = []
+                async for token in query_model_streaming(chairman, messages):
+                    tokens.append(token)
+                    # Send each token
+                    await connection_manager.send_event(
+                        'stage3_token',
+                        Stage3TokenEvent.create(token)['data'],
+                        conversation_id
+                    )
+
+                # Collect full response
+                full_response = ''.join(tokens)
+
+                result = {
+                    "model": chairman,
+                    "response": full_response if full_response else "Error: Unable to generate final synthesis."
+                }
+
+                # Send stage 3 complete event
+                await connection_manager.send_event(
+                    'stage3_complete',
+                    Stage3CompleteEvent.create(result)['data'],
+                    conversation_id
+                )
+
+                return result
+
+            except Exception as e:
+                print(f"Error streaming from chairman {chairman}: {e}")
+                return {
+                    "model": chairman,
+                    "response": "Error: Unable to generate final synthesis."
+                }
+
+        else:
+            # Non-streaming mode (backward compatibility)
+            response = await query_model(chairman, messages)
+
+            if response is None:
+                return {
+                    "model": chairman,
+                    "response": "Error: Unable to generate final synthesis."
+                }
+
             return {
                 "model": chairman,
-                "response": "Error: Unable to generate final synthesis."
+                "response": response.get('content', '')
             }
-
-        return {
-            "model": chairman,
-            "response": response.get('content', '')
-        }
 
     def _parse_ranking_from_text(self, ranking_text: str) -> List[str]:
         """
