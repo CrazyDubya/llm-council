@@ -213,4 +213,201 @@ export const api = {
     }
     return response.json();
   },
+
+  // ===== TIME-TRAVEL BENCHMARKING =====
+
+  /**
+   * Create a benchmark snapshot.
+   */
+  async createBenchmark(conversationId, messageIndex) {
+    const response = await fetch(`${API_BASE}/api/benchmarks`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        message_index: messageIndex,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to create benchmark');
+    }
+    return response.json();
+  },
+
+  /**
+   * List all benchmarks.
+   */
+  async listBenchmarks() {
+    const response = await fetch(`${API_BASE}/api/benchmarks`);
+    if (!response.ok) {
+      throw new Error('Failed to list benchmarks');
+    }
+    const data = await response.json();
+    return data.benchmarks;
+  },
+
+  /**
+   * Get a specific benchmark.
+   */
+  async getBenchmark(snapshotId) {
+    const response = await fetch(`${API_BASE}/api/benchmarks/${snapshotId}`);
+    if (!response.ok) {
+      throw new Error('Failed to get benchmark');
+    }
+    return response.json();
+  },
+
+  /**
+   * Re-run a benchmark.
+   */
+  async rerunBenchmark(snapshotId, models, chairman, strategy = 'simple') {
+    const response = await fetch(
+      `${API_BASE}/api/benchmarks/${snapshotId}/rerun`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ models, chairman, strategy }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to rerun benchmark');
+    }
+    return response.json();
+  },
+
+  // ===== FACT-CHECKING =====
+
+  /**
+   * Extract citations from text.
+   */
+  async extractCitations(text) {
+    const response = await fetch(`${API_BASE}/api/fact-check/citations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to extract citations');
+    }
+    return response.json();
+  },
+
+  /**
+   * Extract claims from text.
+   */
+  async extractClaims(text) {
+    const response = await fetch(`${API_BASE}/api/fact-check/claims`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to extract claims');
+    }
+    return response.json();
+  },
+
+  /**
+   * Cross-reference validate responses.
+   */
+  async crossReferenceValidate(responses) {
+    const response = await fetch(`${API_BASE}/api/fact-check/cross-reference`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ responses }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to cross-reference validate');
+    }
+    return response.json();
+  },
+
+  // ===== MODEL MANAGEMENT =====
+
+  /**
+   * List available models.
+   */
+  async listModels(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.category) params.append('category', filters.category);
+    if (filters.min_context) params.append('min_context', filters.min_context);
+    if (filters.max_cost) params.append('max_cost', filters.max_cost);
+    if (filters.search) params.append('search', filters.search);
+
+    const response = await fetch(
+      `${API_BASE}/api/models?${params.toString()}`
+    );
+    if (!response.ok) {
+      throw new Error('Failed to list models');
+    }
+    const data = await response.json();
+    return data.models;
+  },
+
+  /**
+   * Get model info.
+   */
+  async getModelInfo(modelId) {
+    const response = await fetch(
+      `${API_BASE}/api/models/${encodeURIComponent(modelId)}`
+    );
+    if (!response.ok) {
+      throw new Error('Failed to get model info');
+    }
+    return response.json();
+  },
+
+  /**
+   * Estimate cost for models.
+   */
+  async estimateCost(modelIds, avgPromptTokens = 1000, avgCompletionTokens = 500, numCalls = 1) {
+    const response = await fetch(`${API_BASE}/api/models/estimate-cost`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model_ids: modelIds,
+        avg_prompt_tokens: avgPromptTokens,
+        avg_completion_tokens: avgCompletionTokens,
+        num_calls: numCalls,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to estimate cost');
+    }
+    return response.json();
+  },
+
+  /**
+   * Get council recommendations.
+   */
+  async recommendCouncil(budget = null, diversity = true, includeReasoning = false) {
+    const response = await fetch(`${API_BASE}/api/models/recommend-council`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        budget,
+        diversity,
+        include_reasoning: includeReasoning,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to get recommendations');
+    }
+    const data = await response.json();
+    return data.recommended_models;
+  },
 };

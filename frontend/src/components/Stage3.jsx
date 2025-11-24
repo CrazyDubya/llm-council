@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import FactCheckBadges from './FactCheckBadges';
 import './Stage3.css';
 
 const API_BASE = 'http://localhost:8001';
@@ -8,7 +9,8 @@ export default function Stage3({
   finalResponse,
   conversationId,
   messageIndex,
-  currentFeedback
+  currentFeedback,
+  stage1Responses
 }) {
   const [feedback, setFeedback] = useState(currentFeedback);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,6 +59,12 @@ export default function Stage3({
         <div className="final-text markdown-content">
           <ReactMarkdown>{finalResponse.response}</ReactMarkdown>
         </div>
+
+        {/* Fact-Check Analysis */}
+        <FactCheckBadges
+          text={finalResponse.response}
+          responses={stage1Responses}
+        />
 
         {/* Feedback buttons */}
         {conversationId && messageIndex !== undefined && (
