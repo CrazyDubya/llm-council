@@ -6,16 +6,26 @@ function StrategySelector({ selectedStrategy, onStrategyChange }) {
     simple: { name: 'Simple Ranking', description: 'Default 3-stage ranking' },
     multi_round: { name: 'Multi-Round', description: 'Iterative deliberation with 2 rounds' },
     reasoning_aware: { name: 'Reasoning-Aware', description: 'Optimized for o1/DeepSeek models' },
-    weighted_voting: { name: 'Weighted Voting', description: 'Performance-weighted model influence' }
+    weighted_voting: { name: 'Weighted Voting', description: 'Performance-weighted model influence' },
+    swot: { name: 'SWOT Analysis', description: 'Strengths, Weaknesses, Opportunities, Threats framework' },
+    cost_benefit: { name: 'Cost-Benefit Analysis', description: 'Quantitative cost vs benefit scoring' },
+    decision_matrix: { name: 'Decision Matrix', description: 'Multi-criteria weighted decision analysis' }
   });
 
-  // Strategy options (can be fetched from /api/strategies in the future)
+  // Strategy options grouped by type
   const strategyOptions = [
-    { id: 'simple', name: 'Simple Ranking' },
-    { id: 'multi_round', name: 'Multi-Round (2 rounds)' },
-    { id: 'reasoning_aware', name: 'Reasoning-Aware (o1/DeepSeek)' },
-    { id: 'weighted_voting', name: 'Weighted Voting (Analytics)' }
+    { id: 'simple', name: 'Simple Ranking', group: 'Deliberation' },
+    { id: 'multi_round', name: 'Multi-Round', group: 'Deliberation' },
+    { id: 'reasoning_aware', name: 'Reasoning-Aware', group: 'Deliberation' },
+    { id: 'weighted_voting', name: 'Weighted Voting', group: 'Deliberation' },
+    { id: 'swot', name: 'SWOT Analysis', group: 'Frameworks' },
+    { id: 'cost_benefit', name: 'Cost-Benefit Analysis', group: 'Frameworks' },
+    { id: 'decision_matrix', name: 'Decision Matrix', group: 'Frameworks' }
   ];
+
+  // Group strategies by category
+  const deliberationStrategies = strategyOptions.filter(s => s.group === 'Deliberation');
+  const frameworkStrategies = strategyOptions.filter(s => s.group === 'Frameworks');
 
   return (
     <div className="strategy-selector">
@@ -28,11 +38,20 @@ function StrategySelector({ selectedStrategy, onStrategyChange }) {
         onChange={(e) => onStrategyChange(e.target.value)}
         className="strategy-dropdown"
       >
-        {strategyOptions.map(strategy => (
-          <option key={strategy.id} value={strategy.id}>
-            {strategy.name}
-          </option>
-        ))}
+        <optgroup label="Deliberation Strategies">
+          {deliberationStrategies.map(strategy => (
+            <option key={strategy.id} value={strategy.id}>
+              {strategy.name}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Decision Frameworks">
+          {frameworkStrategies.map(strategy => (
+            <option key={strategy.id} value={strategy.id}>
+              {strategy.name}
+            </option>
+          ))}
+        </optgroup>
       </select>
     </div>
   );

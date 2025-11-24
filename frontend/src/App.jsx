@@ -61,6 +61,51 @@ function App() {
     setCurrentConversationId(id);
   };
 
+  const handleSearch = async (query, tags, includeArchived) => {
+    try {
+      const results = await api.searchConversations(query, tags, includeArchived);
+      setConversations(results);
+    } catch (error) {
+      console.error('Failed to search conversations:', error);
+    }
+  };
+
+  const handleArchiveConversation = async (id) => {
+    try {
+      await api.archiveConversation(id);
+      loadConversations();
+    } catch (error) {
+      console.error('Failed to archive conversation:', error);
+    }
+  };
+
+  const handleUnarchiveConversation = async (id) => {
+    try {
+      await api.unarchiveConversation(id);
+      loadConversations();
+    } catch (error) {
+      console.error('Failed to unarchive conversation:', error);
+    }
+  };
+
+  const handleAddTag = async (id, tag) => {
+    try {
+      await api.addTag(id, tag);
+      loadConversations();
+    } catch (error) {
+      console.error('Failed to add tag:', error);
+    }
+  };
+
+  const handleRemoveTag = async (id, tag) => {
+    try {
+      await api.removeTag(id, tag);
+      loadConversations();
+    } catch (error) {
+      console.error('Failed to remove tag:', error);
+    }
+  };
+
   const handleSendMessage = async (content) => {
     if (!currentConversationId) return;
 
@@ -193,6 +238,11 @@ function App() {
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
         onShowAnalytics={() => setShowAnalytics(true)}
+        onSearch={handleSearch}
+        onArchiveConversation={handleArchiveConversation}
+        onUnarchiveConversation={handleUnarchiveConversation}
+        onAddTag={handleAddTag}
+        onRemoveTag={handleRemoveTag}
       />
       <div className="main-content">
         <StrategySelector

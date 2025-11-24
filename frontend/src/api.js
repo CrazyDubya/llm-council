@@ -122,4 +122,95 @@ export const api = {
       }
     }
   },
+
+  /**
+   * Search conversations.
+   */
+  async searchConversations(query = null, tags = null, includeArchived = false) {
+    const params = new URLSearchParams();
+    if (query) params.append('query', query);
+    if (tags && tags.length > 0) params.append('tags', tags.join(','));
+    if (includeArchived) params.append('include_archived', 'true');
+
+    const response = await fetch(
+      `${API_BASE}/api/conversations/search?${params.toString()}`
+    );
+    if (!response.ok) {
+      throw new Error('Failed to search conversations');
+    }
+    const data = await response.json();
+    return data.results;
+  },
+
+  /**
+   * Add a tag to a conversation.
+   */
+  async addTag(conversationId, tag) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/tags`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tag }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to add tag');
+    }
+    return response.json();
+  },
+
+  /**
+   * Remove a tag from a conversation.
+   */
+  async removeTag(conversationId, tag) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/tags`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tag }),
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to remove tag');
+    }
+    return response.json();
+  },
+
+  /**
+   * Archive a conversation.
+   */
+  async archiveConversation(conversationId) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/archive`,
+      {
+        method: 'POST',
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to archive conversation');
+    }
+    return response.json();
+  },
+
+  /**
+   * Unarchive a conversation.
+   */
+  async unarchiveConversation(conversationId) {
+    const response = await fetch(
+      `${API_BASE}/api/conversations/${conversationId}/unarchive`,
+      {
+        method: 'POST',
+      }
+    );
+    if (!response.ok) {
+      throw new Error('Failed to unarchive conversation');
+    }
+    return response.json();
+  },
 };
