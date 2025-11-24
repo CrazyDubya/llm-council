@@ -74,6 +74,8 @@ class ConversationMetadata(BaseModel):
     created_at: str
     title: str
     message_count: int
+    tags: List[str] = []
+    archived: bool = False
 
 
 class Conversation(BaseModel):
@@ -435,6 +437,94 @@ async def update_feedback(
         return {"status": "success"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class TagRequest(BaseModel):
+    """Request to add/remove a tag."""
+    tag: str
+
+
+class TagsRequest(BaseModel):
+    """Request to set all tags."""
+    tags: List[str]
+
+
+@app.get("/api/conversations/search")
+async def search_conversations_endpoint(
+    query: str = None,
+    tags: str = None,
+    include_archived: bool = False
+):
+    """
+    Search conversations by text query and/or tags.
+
+    Args:
+        query: Text to search for in title and messages
+        tags: Comma-separated list of tags
+        include_archived: Include archived conversations in results
+    """
+    # Parse tags if provided
+    tag_list = None
+    if tags:
+        tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+
+    results = storage.search_conversations(
+        query=query,
+        tags=tag_list,
+        include_archived=include_archived
+    )
+
+    return {"results": results, "count": len(results)}
+
+
+@app.post("/api/conversations/{conversation_id}/tags")
+async def add_tag(conversation_id: str, request: TagRequest):
+    """Add a tag to a conversation."""
+    try:
+        storage.add_conversation_tag(conversation_id, request.tag)
+        return {"status": "success", "tag": request.tag}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.delete("/api/conversations/{conversation_id}/tags")
+async def remove_tag(conversation_id: str, request: TagRequest):
+    """Remove a tag from a conversation."""
+    try:
+        storage.remove_conversation_tag(conversation_id, request.tag)
+        return {"status": "success", "tag": request.tag}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.put("/api/conversations/{conversation_id}/tags")
+async def set_tags(conversation_id: str, request: TagsRequest):
+    """Set all tags for a conversation (replaces existing tags)."""
+    try:
+        storage.set_conversation_tags(conversation_id, request.tags)
+        return {"status": "success", "tags": request.tags}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/conversations/{conversation_id}/archive")
+async def archive_conversation_endpoint(conversation_id: str):
+    """Archive a conversation."""
+    try:
+        storage.archive_conversation(conversation_id)
+        return {"status": "success", "archived": True}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/conversations/{conversation_id}/unarchive")
+async def unarchive_conversation_endpoint(conversation_id: str):
+    """Unarchive a conversation."""
+    try:
+        storage.unarchive_conversation(conversation_id)
+        return {"status": "success", "archived": False}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 if __name__ == "__main__":

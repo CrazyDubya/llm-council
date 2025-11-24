@@ -34,7 +34,9 @@ def create_conversation(conversation_id: str) -> Dict[str, Any]:
         "id": conversation_id,
         "created_at": datetime.utcnow().isoformat(),
         "title": "New Conversation",
-        "messages": []
+        "messages": [],
+        "tags": [],
+        "archived": False
     }
 
     # Save to file
@@ -78,9 +80,12 @@ def save_conversation(conversation: Dict[str, Any]):
         json.dump(conversation, f, indent=2)
 
 
-def list_conversations() -> List[Dict[str, Any]]:
+def list_conversations(include_archived: bool = False) -> List[Dict[str, Any]]:
     """
     List all conversations (metadata only).
+
+    Args:
+        include_archived: If True, include archived conversations. Default False.
 
     Returns:
         List of conversation metadata dicts
@@ -93,12 +98,20 @@ def list_conversations() -> List[Dict[str, Any]]:
             path = os.path.join(DATA_DIR, filename)
             with open(path, 'r') as f:
                 data = json.load(f)
+
+                # Skip archived if not requested
+                is_archived = data.get("archived", False)
+                if is_archived and not include_archived:
+                    continue
+
                 # Return metadata only
                 conversations.append({
                     "id": data["id"],
                     "created_at": data["created_at"],
                     "title": data.get("title", "New Conversation"),
-                    "message_count": len(data["messages"])
+                    "message_count": len(data["messages"]),
+                    "tags": data.get("tags", []),
+                    "archived": is_archived
                 })
 
     # Sort by creation time, newest first
@@ -213,3 +226,162 @@ def update_message_feedback(
     message["feedback_timestamp"] = datetime.utcnow().isoformat()
 
     save_conversation(conversation)
+
+
+def add_conversation_tag(conversation_id: str, tag: str):
+    """
+    Add a tag to a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+        tag: Tag to add
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    tags = conversation.get("tags", [])
+    if tag not in tags:
+        tags.append(tag)
+        conversation["tags"] = tags
+        save_conversation(conversation)
+
+
+def remove_conversation_tag(conversation_id: str, tag: str):
+    """
+    Remove a tag from a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+        tag: Tag to remove
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    tags = conversation.get("tags", [])
+    if tag in tags:
+        tags.remove(tag)
+        conversation["tags"] = tags
+        save_conversation(conversation)
+
+
+def set_conversation_tags(conversation_id: str, tags: List[str]):
+    """
+    Set all tags for a conversation (replaces existing tags).
+
+    Args:
+        conversation_id: Conversation identifier
+        tags: List of tags
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    conversation["tags"] = tags
+    save_conversation(conversation)
+
+
+def archive_conversation(conversation_id: str):
+    """
+    Archive a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    conversation["archived"] = True
+    save_conversation(conversation)
+
+
+def unarchive_conversation(conversation_id: str):
+    """
+    Unarchive a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    conversation["archived"] = False
+    save_conversation(conversation)
+
+
+def search_conversations(
+    query: str = None,
+    tags: List[str] = None,
+    include_archived: bool = False
+) -> List[Dict[str, Any]]:
+    """
+    Search conversations by text query and/or tags.
+
+    Args:
+        query: Text to search for in title and messages (case-insensitive)
+        tags: List of tags - returns conversations that have ANY of these tags
+        include_archived: If True, include archived conversations
+
+    Returns:
+        List of matching conversation metadata dicts
+    """
+    all_conversations = list_conversations(include_archived=include_archived)
+
+    # Filter by tags if specified
+    if tags:
+        all_conversations = [
+            conv for conv in all_conversations
+            if any(tag in conv.get("tags", []) for tag in tags)
+        ]
+
+    # Filter by text query if specified
+    if query and query.strip():
+        query_lower = query.lower()
+        filtered = []
+
+        for conv_meta in all_conversations:
+            # Load full conversation to search messages
+            conv = get_conversation(conv_meta["id"])
+            if conv is None:
+                continue
+
+            # Search in title
+            if query_lower in conv.get("title", "").lower():
+                filtered.append(conv_meta)
+                continue
+
+            # Search in messages
+            found = False
+            for message in conv.get("messages", []):
+                if message.get("role") == "user":
+                    # Search user message content
+                    if query_lower in message.get("content", "").lower():
+                        found = True
+                        break
+                elif message.get("role") == "assistant":
+                    # Search assistant responses
+                    stage1 = message.get("stage1", [])
+                    for response in stage1:
+                        if query_lower in response.get("response", "").lower():
+                            found = True
+                            break
+                    if found:
+                        break
+
+                    stage3 = message.get("stage3", {})
+                    if query_lower in stage3.get("response", "").lower():
+                        found = True
+                        break
+
+                if found:
+                    break
+
+            if found:
+                filtered.append(conv_meta)
+
+        all_conversations = filtered
+
+    return all_conversations
