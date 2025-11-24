@@ -132,6 +132,7 @@ export default function ChatInterface({
                       conversationId={conversation?.id}
                       messageIndex={index}
                       currentFeedback={msg.user_feedback}
+                      stage1Responses={msg.stage1}
                     />
                   )}
                 </div>

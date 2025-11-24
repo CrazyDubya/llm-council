@@ -7,6 +7,8 @@ export default function Sidebar({
   onSelectConversation,
   onNewConversation,
   onShowAnalytics,
+  onShowModelBrowser,
+  onShowTimeTravel,
   onSearch,
   onArchiveConversation,
   onUnarchiveConversation,
@@ -80,6 +82,12 @@ export default function Sidebar({
         <div className="sidebar-buttons">
           <button className="analytics-btn" onClick={onShowAnalytics} title="View Analytics">
             📊
+          </button>
+          <button className="analytics-btn" onClick={onShowModelBrowser} title="Model Browser">
+            🤖
+          </button>
+          <button className="analytics-btn" onClick={onShowTimeTravel} title="Time-Travel Benchmarks">
+            ⏱️
           </button>
           <button className="new-conversation-btn" onClick={onNewConversation}>
             + New

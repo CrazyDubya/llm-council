@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import StrategySelector from './components/StrategySelector';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import ModelBrowser from './components/ModelBrowser';
+import TimeTravelComparison from './components/TimeTravelComparison';
 import { api } from './api';
 import './App.css';
 
@@ -13,6 +15,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState('simple');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showModelBrowser, setShowModelBrowser] = useState(false);
+  const [showTimeTravel, setShowTimeTravel] = useState(false);
 
   // Load conversations on mount
   useEffect(() => {
@@ -104,6 +108,14 @@ function App() {
     } catch (error) {
       console.error('Failed to remove tag:', error);
     }
+  };
+
+  const handleSelectModels = (modelIds) => {
+    // TODO: Implement model selection logic
+    // This could update config or allow per-query model selection
+    console.log('Selected models:', modelIds);
+    // For now, just close the modal
+    setShowModelBrowser(false);
   };
 
   const handleSendMessage = async (content) => {
@@ -238,6 +250,8 @@ function App() {
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
         onShowAnalytics={() => setShowAnalytics(true)}
+        onShowModelBrowser={() => setShowModelBrowser(true)}
+        onShowTimeTravel={() => setShowTimeTravel(true)}
         onSearch={handleSearch}
         onArchiveConversation={handleArchiveConversation}
         onUnarchiveConversation={handleUnarchiveConversation}
@@ -261,6 +275,19 @@ function App() {
       {/* Analytics Dashboard Modal */}
       {showAnalytics && (
         <AnalyticsDashboard onClose={() => setShowAnalytics(false)} />
+      )}
+
+      {/* Model Browser Modal */}
+      {showModelBrowser && (
+        <ModelBrowser
+          onClose={() => setShowModelBrowser(false)}
+          onSelectModels={handleSelectModels}
+        />
+      )}
+
+      {/* Time-Travel Comparison Modal */}
+      {showTimeTravel && (
+        <TimeTravelComparison onClose={() => setShowTimeTravel(false)} />
       )}
     </div>
   );
