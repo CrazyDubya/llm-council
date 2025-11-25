@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { api } from '../api';
 import './StrategyRecommendation.css';
 
 export default function StrategyRecommendation({ query, onAccept, onDismiss }) {
   const [recommendation, setRecommendation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     // Debounce: only fetch after user stops typing for 500ms
@@ -13,31 +15,50 @@ export default function StrategyRecommendation({ query, onAccept, onDismiss }) {
         fetchRecommendation(query);
       }, 500);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        // Cancel any in-flight request when query changes
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
     } else {
       setRecommendation(null);
     }
   }, [query, dismissed]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const fetchRecommendation = async (queryText) => {
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8001/api/strategies/recommend', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: queryText })
-      });
+      const data = await api.getStrategyRecommendation(
+        queryText,
+        abortControllerRef.current.signal
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        // Only set if confidence is reasonable
-        if (data.confidence >= 0.2) {
-          setRecommendation(data);
-        }
-      } else {
-        console.warn('Recommendation request failed:', response.status);
+      // Only set if confidence is reasonable
+      if (data.confidence >= 0.2) {
+        setRecommendation(data);
       }
     } catch (error) {
+      if (error.name === 'AbortError') {
+        // Request was cancelled, ignore
+        return;
+      }
       console.error('Failed to get strategy recommendation:', error);
       // Silently fail - recommendation is optional enhancement
     } finally {

@@ -14,7 +14,7 @@ from . import storage
 from .council import generate_conversation_title
 from .strategies import get_strategy, list_strategies
 from .strategies.recommender import StrategyRecommender
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .config import COUNCIL_MODELS, CHAIRMAN_MODEL, CORS_ORIGINS, SERVER_PORT
 from .analytics import AnalyticsEngine
 from .query_classifier import QueryClassifier
 
@@ -37,7 +37,7 @@ app = FastAPI(title="LLM Council API")
 # Enable CORS for local development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -439,4 +439,4 @@ async def update_feedback(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=SERVER_PORT)

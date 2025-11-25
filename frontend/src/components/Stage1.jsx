@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import CopyButton from './CopyButton';
 import './Stage1.css';
 
 export default function Stage1({ responses }) {
@@ -8,6 +9,8 @@ export default function Stage1({ responses }) {
   if (!responses || responses.length === 0) {
     return null;
   }
+
+  const activeResponse = responses[activeTab];
 
   return (
     <div className="stage stage1">
@@ -26,9 +29,12 @@ export default function Stage1({ responses }) {
       </div>
 
       <div className="tab-content">
-        <div className="model-name">{responses[activeTab].model}</div>
+        <div className="response-header">
+          <div className="model-name">{activeResponse.model}</div>
+          <CopyButton text={activeResponse.response} />
+        </div>
         <div className="response-text markdown-content">
-          <ReactMarkdown>{responses[activeTab].response}</ReactMarkdown>
+          <ReactMarkdown>{activeResponse.response}</ReactMarkdown>
         </div>
       </div>
     </div>
