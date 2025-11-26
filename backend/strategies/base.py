@@ -20,6 +20,7 @@ class EnsembleStrategy(ABC):
             config: Optional configuration dictionary specific to this strategy
         """
         self.config = config or {}
+        self.strategy_key = self.config.get('strategy_key', self.__class__.__name__)
 
     @abstractmethod
     async def execute(
@@ -65,6 +66,15 @@ class EnsembleStrategy(ABC):
             Strategy description for UI display
         """
         return ""
+
+    def make_call_context(self, stage: str, **extra: Any) -> Dict[str, Any]:
+        """Helper to annotate OpenRouter calls with strategy + stage info."""
+        context = {
+            'strategy': self.strategy_key,
+            'stage': stage,
+        }
+        context.update(extra)
+        return context
 
     def get_config_schema(self) -> Dict[str, Any]:
         """

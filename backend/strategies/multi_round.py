@@ -18,6 +18,7 @@ class MultiRoundStrategy(EnsembleStrategy):
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
+        self.strategy_key = self.config.get('strategy_key', 'multi_round')
         self.rounds = config.get('rounds', 2) if config else 2
         self.show_top_n = config.get('show_top_n', 2) if config else 2
 
@@ -100,7 +101,11 @@ class MultiRoundStrategy(EnsembleStrategy):
 
         # Collect initial responses
         messages = [{"role": "user", "content": query}]
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('round_initial_responses', round=1)
+        )
 
         stage1_results = []
         for model, response in responses.items():
@@ -112,7 +117,7 @@ class MultiRoundStrategy(EnsembleStrategy):
 
         # Anonymize and rank
         rankings, label_to_model = await self._collect_rankings(
-            query, stage1_results, models
+            query, stage1_results, models, round_number=1
         )
 
         # Calculate aggregate
@@ -156,7 +161,15 @@ class MultiRoundStrategy(EnsembleStrategy):
         revised_responses = []
         for model in models:
             messages = [{"role": "user", "content": revision_prompts[model]}]
-            response = await query_model(model, messages)
+            response = await query_model(
+                model,
+                messages,
+                call_context=self.make_call_context(
+                    'round_revision_response',
+                    round=round_number,
+                    responder=model
+                )
+            )
 
             if response is not None:
                 revised_responses.append({
@@ -166,7 +179,7 @@ class MultiRoundStrategy(EnsembleStrategy):
 
         # Rank the revised responses
         rankings, label_to_model = await self._collect_rankings(
-            query, revised_responses, models
+            query, revised_responses, models, round_number=round_number
         )
 
         # Calculate aggregate
@@ -265,7 +278,8 @@ Provide your revised answer:"""
         self,
         user_query: str,
         responses: List[Dict[str, Any]],
-        models: List[str]
+        models: List[str],
+        round_number: int
     ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
         """Collect rankings (same as SimpleRankingStrategy)."""
 
@@ -301,7 +315,11 @@ IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
 Now provide your evaluation and ranking:"""
 
         messages = [{"role": "user", "content": ranking_prompt}]
-        responses_dict = await query_models_parallel(models, messages)
+        responses_dict = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('round_peer_review', round=round_number)
+        )
 
         stage2_results = []
         for model, response in responses_dict.items():
@@ -399,7 +417,11 @@ Your task as Chairman is to synthesize the final answer, considering:
 Provide a comprehensive final answer that represents the council's collective wisdom after deliberation:"""
 
         messages = [{"role": "user", "content": chairman_prompt}]
-        response = await query_model(chairman, messages)
+        response = await query_model(
+            chairman,
+            messages,
+            call_context=self.make_call_context('stage3_synthesis', round=len(all_rounds), role='chairman')
+        )
 
         if response is None:
             return {

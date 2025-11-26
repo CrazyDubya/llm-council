@@ -13,132 +13,152 @@ export default function ChatInterface({
   isLoading,
   selectedStrategy,
   onStrategyChange,
+  strategyOptions = [],
+  selectedCouncil,
+  onCouncilChange,
+  councilOptions = [],
 }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const strategies = strategyOptions.length
+    ? strategyOptions
+    : [
+        { id: 'simple', name: 'Simple Ranking' },
+        { id: 'weighted_voting', name: 'Weighted Voting' },
+        { id: 'multi_round', name: 'Multi-Round' },
+        { id: 'reasoning_aware', name: 'Reasoning-Aware' },
+      ];
+
+  const councils = councilOptions.length
+    ? councilOptions
+    : [
+        { id: 'full', name: 'Full Council' },
+        { id: 'low_cost', name: 'Budget Council' },
+        { id: 'hybrid', name: 'Hybrid Council' },
+      ];
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversation]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (input.trim() && !isLoading) {
-      onSendMessage(input);
-      setInput('');
-    }
+    if (!input.trim() || isLoading) return;
+    onSendMessage(input, selectedStrategy);
+    setInput('');
   };
 
   const handleKeyDown = (e) => {
-    // Submit on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
   };
 
-  if (!conversation) {
-    return (
-      <div className="chat-interface">
-        <div className="empty-state">
-          <h2>Welcome to LLM Council</h2>
-          <p>Create a new conversation to get started</p>
-        </div>
-      </div>
-    );
-  }
+  const messages = conversation?.messages || [];
+  const currentStrategy = strategies.find((s) => s.id === selectedStrategy) || strategies[0];
+  const currentCouncil = councils.find((c) => c.id === selectedCouncil) || councils[0];
 
   return (
     <div className="chat-interface">
       <div className="messages-container">
-        {conversation.messages.length === 0 ? (
+        {!conversation && (
+          <div className="empty-state">
+            <h2>Welcome to LLM Council</h2>
+            <p>Ask your first question to spin up the council.</p>
+          </div>
+        )}
+
+        {!messages.length && conversation && (
           <div className="empty-state">
             <h2>Start a conversation</h2>
             <p>Ask a question to consult the LLM Council</p>
           </div>
-        ) : (
-          conversation.messages.map((msg, index) => (
-            <div key={index} className="message-group">
-              {msg.role === 'user' ? (
-                <div className="user-message">
-                  <div className="message-label">You</div>
-                  <div className="message-content">
-                    <div className="markdown-content">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    </div>
+        )}
+
+        {conversation && (
+          <div className="session-summary">
+            <span>Strategy: {currentStrategy?.name || currentStrategy?.id}</span>
+            {currentCouncil && (
+              <span>Council: {currentCouncil.name || currentCouncil.id}</span>
+            )}
+          </div>
+        )}
+
+        {messages.map((msg, index) => (
+          <div key={index} className="message-group">
+            {msg.role === 'user' ? (
+              <div className="user-message">
+                <div className="message-label">You</div>
+                <div className="message-content">
+                  <div className="markdown-content">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
                   </div>
                 </div>
-              ) : (
-                <div className="assistant-message">
-                  <div className="message-label">LLM Council</div>
+              </div>
+            ) : (
+              <div className="assistant-message">
+                <div className="message-label">LLM Council</div>
 
-                  {/* Detect if this is multi-round strategy */}
-                  {msg.stage1 && Array.isArray(msg.stage1) && msg.stage1[0]?.round_number ? (
-                    // Multi-round strategy
-                    <div className="multi-round-container">
-                      {msg.loading?.stage1 && (
-                        <div className="stage-loading">
-                          <div className="spinner"></div>
-                          <span>Running multi-round deliberation...</span>
-                        </div>
-                      )}
-                      {!msg.loading?.stage1 && (
-                        <MultiRoundView rounds={msg.stage1} metadata={msg.metadata} />
-                      )}
-                    </div>
-                  ) : (
-                    // Simple strategy
-                    <>
-                      {/* Stage 1 */}
-                      {msg.loading?.stage1 && (
-                        <div className="stage-loading">
-                          <div className="spinner"></div>
-                          <span>Running Stage 1: Collecting individual responses...</span>
-                        </div>
-                      )}
-                      {msg.stage1 && <Stage1 responses={msg.stage1} />}
+                {msg.stage1 && Array.isArray(msg.stage1) && msg.stage1[0]?.round_number ? (
+                  <div className="multi-round-container">
+                    {msg.loading?.stage1 && (
+                      <div className="stage-loading">
+                        <div className="spinner"></div>
+                        <span>Running multi-round deliberation...</span>
+                      </div>
+                    )}
+                    {!msg.loading?.stage1 && (
+                      <MultiRoundView rounds={msg.stage1} metadata={msg.metadata} />
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {msg.loading?.stage1 && (
+                      <div className="stage-loading">
+                        <div className="spinner"></div>
+                        <span>Running Stage 1: Collecting individual responses...</span>
+                      </div>
+                    )}
+                    {msg.stage1 && <Stage1 responses={msg.stage1} />}
 
-                      {/* Stage 2 */}
-                      {msg.loading?.stage2 && (
-                        <div className="stage-loading">
-                          <div className="spinner"></div>
-                          <span>Running Stage 2: Peer rankings...</span>
-                        </div>
-                      )}
-                      {msg.stage2 && (
-                        <Stage2
-                          rankings={msg.stage2}
-                          labelToModel={msg.metadata?.label_to_model}
-                          aggregateRankings={msg.metadata?.aggregate_rankings}
-                        />
-                      )}
-                    </>
-                  )}
+                    {msg.loading?.stage2 && (
+                      <div className="stage-loading">
+                        <div className="spinner"></div>
+                        <span>Running Stage 2: Peer rankings...</span>
+                      </div>
+                    )}
+                    {msg.stage2 && (
+                      <Stage2
+                        rankings={msg.stage2}
+                        labelToModel={msg.metadata?.label_to_model}
+                        aggregateRankings={msg.metadata?.aggregate_rankings}
+                      />
+                    )}
+                  </>
+                )}
 
-                  {/* Stage 3 (common to all strategies) */}
-                  {msg.loading?.stage3 && (
-                    <div className="stage-loading">
-                      <div className="spinner"></div>
-                      <span>Running Stage 3: Final synthesis...</span>
-                    </div>
-                  )}
-                  {msg.stage3 && (
-                    <Stage3
-                      finalResponse={msg.stage3}
-                      conversationId={conversation?.id}
-                      messageIndex={index}
-                      currentFeedback={msg.user_feedback}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          ))
-        )}
+                {msg.loading?.stage3 && (
+                  <div className="stage-loading">
+                    <div className="spinner"></div>
+                    <span>Running Stage 3: Final synthesis...</span>
+                  </div>
+                )}
+                {msg.stage3 && (
+                  <Stage3
+                    finalResponse={msg.stage3}
+                    conversationId={conversation?.id}
+                    messageIndex={index}
+                    currentFeedback={msg.user_feedback}
+                    apiUsage={msg.metadata?.api_usage}
+                    councilInfo={msg.metadata?.council}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        ))}
 
         {isLoading && (
           <div className="loading-indicator">
@@ -150,14 +170,12 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Strategy Recommendation */}
       <StrategyRecommendation
         query={input}
         onAccept={(strategy) => onStrategyChange(strategy)}
         onDismiss={() => {}}
       />
 
-      {/* Input Form (always visible when conversation exists) */}
       <form className="input-form" onSubmit={handleSubmit}>
         <textarea
           className="message-input"

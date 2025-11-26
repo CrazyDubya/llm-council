@@ -24,6 +24,103 @@
   font-size: 15px;
 }
 
+.api-usage {
+  margin-top: 20px;
+  border-top: 1px solid #e0efe0;
+  padding-top: 15px;
+  font-size: 13px;
+}
+
+.council-info {
+  margin-top: 16px;
+  border-top: 1px solid #e0efe0;
+  padding-top: 12px;
+}
+
+.council-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.council-models {
+  display: block;
+  color: #1f4172;
+}
+
+.usage-heading {
+  font-weight: 600;
+  color: #2d5a8a;
+  margin-bottom: 10px;
+}
+
+.usage-totals {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.usage-label {
+  display: block;
+  font-size: 12px;
+  color: #7a7a7a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.usage-totals strong {
+  font-size: 15px;
+  color: #222;
+}
+
+.usage-call-list {
+  border: 1px solid #e0ecff;
+  border-radius: 6px;
+  background: #f7fbff;
+}
+
+.usage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.usage-row:first-child {
+  border-top: none;
+}
+
+.usage-model-name {
+  font-weight: 600;
+  color: #1f4172;
+}
+
+.usage-stage {
+  color: #66789c;
+}
+
+.usage-metrics {
+  display: flex;
+  gap: 12px;
+  font-family: monospace;
+  color: #444;
+}
+
+.usage-cost {
+  font-weight: 600;
+  color: #1c7c54;
+}
+
+.usage-note {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #6a6a6a;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
 .feedback-section {
   display: flex;
   align-items: center;

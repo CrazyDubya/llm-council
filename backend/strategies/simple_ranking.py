@@ -16,6 +16,10 @@ class SimpleRankingStrategy(EnsembleStrategy):
     3. Chairman synthesizes final answer with full context
     """
 
+    def __init__(self, config=None):
+        super().__init__(config)
+        self.strategy_key = self.config.get('strategy_key', 'simple')
+
     def get_name(self) -> str:
         return "Simple Ranking"
 
@@ -95,7 +99,11 @@ class SimpleRankingStrategy(EnsembleStrategy):
         messages = [{"role": "user", "content": user_query}]
 
         # Query all models in parallel
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('stage1_initial_responses')
+        )
 
         # Format results
         stage1_results = []
@@ -174,7 +182,11 @@ Now provide your evaluation and ranking:"""
         messages = [{"role": "user", "content": ranking_prompt}]
 
         # Get rankings from all council models in parallel
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('stage2_peer_review')
+        )
 
         # Format results
         stage2_results = []
@@ -240,7 +252,11 @@ Provide a clear, well-reasoned final answer that represents the council's collec
         messages = [{"role": "user", "content": chairman_prompt}]
 
         # Query the chairman model
-        response = await query_model(chairman, messages)
+        response = await query_model(
+            chairman,
+            messages,
+            call_context=self.make_call_context('stage3_synthesis', role='chairman')
+        )
 
         if response is None:
             # Fallback if chairman fails

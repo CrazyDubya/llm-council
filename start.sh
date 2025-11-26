@@ -15,14 +15,34 @@ sleep 2
 
 # Start frontend
 echo "Starting frontend on http://localhost:5173..."
-cd frontend
+cd frontend || exit 1
+if [ ! -d node_modules ]; then
+  echo "Installing frontend dependencies..."
+  npm install || exit 1
+fi
 npm run dev &
 FRONTEND_PID=$!
+cd ..
 
 echo ""
 echo "✓ LLM Council is running!"
 echo "  Backend:  http://localhost:8001"
 echo "  Frontend: http://localhost:5173"
+echo ""
+echo "Waiting for frontend to become available..."
+for i in {1..30}; do
+  if command -v curl >/dev/null 2>&1 && curl -s http://localhost:5173 >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
+
+echo "Opening the web dashboard..."
+if command -v open >/dev/null 2>&1; then
+  open "http://localhost:5173" >/dev/null 2>&1 &
+elif command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "http://localhost:5173" >/dev/null 2>&1 &
+fi
 echo ""
 echo "Press Ctrl+C to stop both servers"
 

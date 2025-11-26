@@ -12,6 +12,20 @@
   padding: 24px;
 }
 
+.session-summary {
+  display: flex;
+  gap: 16px;
+  padding: 0 24px;
+  font-size: 13px;
+  color: #4f4f4f;
+}
+
+.session-summary span {
+  background: #f5f7ff;
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -20,6 +34,94 @@
   height: 100%;
   color: #666;
   text-align: center;
+}
+
+.quick-start {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  text-align: left;
+  gap: 16px;
+}
+
+.quick-start p {
+  color: #4f4f4f;
+  margin-bottom: 12px;
+}
+
+.quick-input {
+  width: 100%;
+  border: 1px solid #d0d0d0;
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 140px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.quick-input:focus {
+  border-color: #4a90e2;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.quick-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 14px;
+  color: #555;
+}
+
+.quick-controls select {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #d0d0d0;
+  font-size: 14px;
+}
+
+.quick-submit {
+  margin-top: 8px;
+  align-self: flex-start;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  background: #4a90e2;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.quick-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quick-submit:not(:disabled):hover {
+  background: #357abd;
+}
+
+.quick-default {
+  margin-top: 8px;
+  align-self: flex-start;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid #d0d0d0;
+  background: #f4f6fb;
+  color: #1f4172;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.quick-default:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .empty-state h2 {
