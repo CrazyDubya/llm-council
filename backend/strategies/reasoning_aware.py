@@ -18,6 +18,7 @@ class ReasoningAwareStrategy(EnsembleStrategy):
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
+        self.strategy_key = self.config.get('strategy_key', 'reasoning_aware')
         self.reasoning_weight = config.get('reasoning_weight', 0.4) if config else 0.4
         self.answer_weight = config.get('answer_weight', 0.6) if config else 0.6
 
@@ -120,7 +121,11 @@ class ReasoningAwareStrategy(EnsembleStrategy):
         """Collect responses and extract reasoning traces."""
 
         messages = [{"role": "user", "content": query}]
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('stage1_initial_responses')
+        )
 
         stage1_results = []
         for model, response in responses.items():
@@ -184,7 +189,11 @@ IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
 Now provide your evaluation and ranking:"""
 
         messages = [{"role": "user", "content": ranking_prompt}]
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('stage2_reasoning_review')
+        )
 
         rankings = []
         for model, response in responses.items():
@@ -233,7 +242,11 @@ FINAL RANKING: (list from best to worst)
 """
 
         messages = [{"role": "user", "content": ranking_prompt}]
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('stage2_answer_review')
+        )
 
         rankings = []
         for model, response in responses.items():
@@ -316,7 +329,11 @@ Your task: Synthesize a final answer that:
 Provide the final answer:"""
 
         messages = [{"role": "user", "content": chairman_prompt}]
-        response = await query_model(chairman, messages)
+        response = await query_model(
+            chairman,
+            messages,
+            call_context=self.make_call_context('stage3_synthesis', has_reasoning=has_reasoning, role='chairman')
+        )
 
         if response is None:
             return {

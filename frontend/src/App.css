@@ -20,3 +20,52 @@
   flex: 1;
   overflow: hidden;
 }
+
+.control-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px 0 24px;
+}
+
+.council-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 260px;
+}
+
+.council-selector select {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #d0d0d0;
+}
+
+.council-preview {
+  font-size: 12px;
+  color: #4f4f4f;
+  line-height: 1.4;
+}
+
+.round-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.round-selector input {
+  width: 80px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #d0d0d0;
+}
+
+.workbench-toggle {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid #4a90e2;
+  background: #e8f1ff;
+  color: #1f4172;
+  font-weight: 600;
+  cursor: pointer;
+}

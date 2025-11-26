@@ -8,7 +8,9 @@ export default function Stage3({
   finalResponse,
   conversationId,
   messageIndex,
-  currentFeedback
+  currentFeedback,
+  apiUsage,
+  councilInfo
 }) {
   const [feedback, setFeedback] = useState(currentFeedback);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -16,6 +18,16 @@ export default function Stage3({
   if (!finalResponse) {
     return null;
   }
+
+  const formatCost = (value) => {
+    if (value === null || value === undefined) {
+      return 'n/a';
+    }
+    if (value < 0.001) {
+      return `$${value.toExponential(2)}`;
+    }
+    return `$${value.toFixed(3)}`;
+  };
 
   const handleFeedback = async (value) => {
     if (!conversationId || messageIndex === undefined) {
@@ -57,6 +69,65 @@ export default function Stage3({
         <div className="final-text markdown-content">
           <ReactMarkdown>{finalResponse.response}</ReactMarkdown>
         </div>
+
+        {councilInfo && (
+          <div className="council-info">
+            <div className="usage-heading">Council Configuration</div>
+            <div className="council-details">
+              <div>
+                <span className="usage-label">Chairman</span>
+                <strong>{councilInfo.chairman}</strong>
+              </div>
+              <div>
+                <span className="usage-label">Models</span>
+                <span className="council-models">{(councilInfo.models || []).join(', ')}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {apiUsage?.calls?.length ? (
+          <div className="api-usage">
+            <div className="usage-heading">API Usage & Estimated Cost</div>
+            <div className="usage-totals">
+              <div>
+                <span className="usage-label">Total Prompt Tokens</span>
+                <strong>{apiUsage.total_prompt_tokens?.toLocaleString?.() ?? 'n/a'}</strong>
+              </div>
+              <div>
+                <span className="usage-label">Total Completion Tokens</span>
+                <strong>{apiUsage.total_completion_tokens?.toLocaleString?.() ?? 'n/a'}</strong>
+              </div>
+              <div>
+                <span className="usage-label">Estimated Cost</span>
+                <strong>{formatCost(apiUsage.total_cost)}</strong>
+              </div>
+            </div>
+            <div className="usage-call-list">
+              {apiUsage.calls.slice(0, 5).map((call, idx) => (
+                <div key={idx} className="usage-row">
+                  <div className="usage-model">
+                    <div className="usage-model-name">{call.model}</div>
+                    <div className="usage-stage">
+                      {call.context?.stage || 'unknown stage'}
+                      {call.context?.round ? ` · round ${call.context.round}` : ''}
+                    </div>
+                  </div>
+                  <div className="usage-metrics">
+                    <span>{call.usage?.prompt_tokens ?? 0} prompt</span>
+                    <span>{call.usage?.completion_tokens ?? 0} completion</span>
+                  </div>
+                  <div className="usage-cost">{formatCost(call.cost)}</div>
+                </div>
+              ))}
+              {apiUsage.calls.length > 5 && (
+                <div className="usage-note">
+                  Showing first 5 of {apiUsage.calls.length} calls. View analytics for the full trace.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
 
         {/* Feedback buttons */}
         {conversationId && messageIndex !== undefined && (

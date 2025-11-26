@@ -18,6 +18,7 @@ class WeightedVotingStrategy(EnsembleStrategy):
 
     def __init__(self, config: Dict[str, Any] = None):
         super().__init__(config)
+        self.strategy_key = self.config.get('strategy_key', 'weighted_voting')
         # Analytics engine will be injected via config
         self.analytics = config.get('analytics_engine') if config else None
         self.min_weight = config.get('min_weight', 0.1) if config else 0.1
@@ -148,7 +149,11 @@ class WeightedVotingStrategy(EnsembleStrategy):
     ) -> List[Dict[str, Any]]:
         """Stage 1: Collect individual responses from all council models."""
         messages = [{"role": "user", "content": user_query}]
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('stage1_initial_responses')
+        )
 
         stage1_results = []
         for model, response in responses.items():
@@ -202,7 +207,11 @@ IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
 Now provide your evaluation and ranking:"""
 
         messages = [{"role": "user", "content": ranking_prompt}]
-        responses = await query_models_parallel(models, messages)
+        responses = await query_models_parallel(
+            models,
+            messages,
+            call_context=self.make_call_context('stage2_peer_review')
+        )
 
         stage2_results = []
         for model, response in responses.items():
@@ -254,7 +263,11 @@ Your task as Chairman is to synthesize all of this information into a single, co
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
 
         messages = [{"role": "user", "content": chairman_prompt}]
-        response = await query_model(chairman, messages)
+        response = await query_model(
+            chairman,
+            messages,
+            call_context=self.make_call_context('stage3_synthesis', role='chairman')
+        )
 
         if response is None:
             return {

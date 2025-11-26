@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
@@ -14,9 +14,11 @@ from . import storage
 from .council import generate_conversation_title
 from .strategies import get_strategy, list_strategies
 from .strategies.recommender import StrategyRecommender
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .config import COUNCIL_MODELS, CHAIRMAN_MODEL, COUNCIL_PRESETS
 from .analytics import AnalyticsEngine
 from .query_classifier import QueryClassifier
+from .openrouter import reset_call_log, summarize_call_log
+from .pricing import PricingManager
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +32,7 @@ logger.info("Initializing analytics engine and recommender system...")
 analytics = AnalyticsEngine()
 classifier = QueryClassifier()
 recommender = StrategyRecommender(classifier, analytics)
+pricing_manager = PricingManager(logger=logger)
 logger.info("System initialization complete")
 
 app = FastAPI(title="LLM Council API")
@@ -54,6 +57,8 @@ class SendMessageRequest(BaseModel):
     content: str
     strategy: str = "simple"  # Default to simple strategy
     strategy_config: Dict[str, Any] = {}
+    council: Optional[str] = None
+    custom_council: Optional[Dict[str, Any]] = None
 
 
 class RecommendStrategyRequest(BaseModel):
@@ -66,6 +71,8 @@ class CompareStrategiesRequest(BaseModel):
     query: str
     strategies: List[str]
     strategy_configs: Dict[str, Dict[str, Any]] = {}
+    council: Optional[str] = None
+    custom_council: Optional[Dict[str, Any]] = None
 
 
 class ConversationMetadata(BaseModel):
@@ -84,6 +91,40 @@ class Conversation(BaseModel):
     messages: List[Dict[str, Any]]
 
 
+def resolve_council_selection(
+    council_name: Optional[str],
+    custom_council: Optional[Dict[str, Any]]
+):
+    """Resolve models/chairman information for a request."""
+    if custom_council:
+        models = custom_council.get('models') or []
+        chairman = custom_council.get('chairman')
+        if not models or not chairman:
+            raise HTTPException(
+                status_code=400,
+                detail="Custom council must include 'models' and 'chairman'"
+            )
+        return models, chairman, {
+            'type': 'custom',
+            'models': models,
+            'chairman': chairman
+        }
+
+    preset_key = council_name or 'full'
+    preset = COUNCIL_PRESETS.get(preset_key)
+    if preset is None:
+        raise HTTPException(status_code=400, detail=f"Unknown council '{preset_key}'")
+
+    return preset['models'], preset['chairman'], {
+        'type': 'preset',
+        'id': preset_key,
+        'name': preset.get('name', preset_key),
+        'description': preset.get('description'),
+        'models': preset['models'],
+        'chairman': preset['chairman']
+    }
+
+
 @app.get("/")
 async def root():
     """Health check endpoint."""
@@ -94,6 +135,12 @@ async def root():
 async def get_strategies():
     """List all available ensemble strategies."""
     return list_strategies()
+
+
+@app.get("/api/councils")
+async def get_councils():
+    """List available council presets."""
+    return COUNCIL_PRESETS
 
 
 @app.post("/api/strategies/recommend")
@@ -138,6 +185,11 @@ async def compare_strategies(request: CompareStrategiesRequest):
                 detail=f"Unknown strategy '{strategy_name}'. Available: {', '.join(available_strategies.keys())}"
             )
 
+    models_to_use, chairman_model, council_info = resolve_council_selection(
+        request.council,
+        request.custom_council
+    )
+
     # Run all strategies in parallel
     async def run_strategy(strategy_name: str):
         try:
@@ -151,11 +203,16 @@ async def compare_strategies(request: CompareStrategiesRequest):
 
             # Get and execute strategy
             strategy = get_strategy(strategy_name, config=config)
+            reset_call_log()
             result = await strategy.execute(
                 query=request.query,
-                models=COUNCIL_MODELS,
-                chairman=CHAIRMAN_MODEL
+                models=models_to_use,
+                chairman=chairman_model
             )
+            usage_summary = summarize_call_log(pricing_manager.estimate_cost)
+            metadata = result.setdefault('metadata', {})
+            metadata['api_usage'] = usage_summary
+            metadata['council'] = council_info
 
             return {
                 'strategy': strategy_name,
@@ -217,6 +274,11 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
 
+    models_to_use, chairman_model, council_info = resolve_council_selection(
+        request.council,
+        request.custom_council
+    )
+
     # Add user message
     storage.add_user_message(conversation_id, request.content)
 
@@ -240,11 +302,16 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Execute the strategy
     try:
+        reset_call_log()
         result = await strategy.execute(
             query=request.content,
-            models=COUNCIL_MODELS,
-            chairman=CHAIRMAN_MODEL
+            models=models_to_use,
+            chairman=chairman_model
         )
+        usage_summary = summarize_call_log(pricing_manager.estimate_cost)
+        metadata = result.setdefault('metadata', {})
+        metadata['api_usage'] = usage_summary
+        metadata['council'] = council_info
         logger.info(f"Strategy execution complete: {request.strategy}")
     except Exception as e:
         logger.error(f"Strategy execution failed: {str(e)}", exc_info=True)
@@ -294,6 +361,10 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
     async def event_generator():
         try:
+            models_to_use, chairman_model, council_info = resolve_council_selection(
+                request.council,
+                request.custom_council
+            )
             # Add user message
             storage.add_user_message(conversation_id, request.content)
 
@@ -311,12 +382,17 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             strategy = get_strategy(request.strategy, config=config)
 
             # Execute strategy (non-streaming for now - future: support streaming in strategy interface)
+            reset_call_log()
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
             result = await strategy.execute(
                 query=request.content,
-                models=COUNCIL_MODELS,
-                chairman=CHAIRMAN_MODEL
+                models=models_to_use,
+                chairman=chairman_model
             )
+            usage_summary = summarize_call_log(pricing_manager.estimate_cost)
+            metadata = result.setdefault('metadata', {})
+            metadata['api_usage'] = usage_summary
+            metadata['council'] = council_info
 
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': result['stage1']})}\n\n"
 
