@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import StrategySelector from './components/StrategySelector';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import ErrorBoundary from './components/ErrorBoundary';
+import ThemeToggle from './components/ThemeToggle';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { api } from './api';
 import './App.css';
 
@@ -13,6 +16,32 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState('simple');
   const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Ref for AbortController to cancel in-flight requests
+  const abortControllerRef = useRef(null);
+  // Ref for search input focus
+  const searchInputRef = useRef(null);
+
+  // Keyboard shortcuts
+  const shortcuts = {
+    'ctrl+n': useCallback(() => handleNewConversation(), []),
+    'ctrl+k': useCallback(() => setShowAnalytics(true), []),
+    'ctrl+/': useCallback(() => {
+      // Focus the search input in sidebar
+      const searchInput = document.querySelector('.search-input');
+      if (searchInput) searchInput.focus();
+    }, []),
+    'escape': useCallback(() => {
+      setShowAnalytics(false);
+      // Cancel in-flight request if loading
+      if (isLoading && abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        setIsLoading(false);
+      }
+    }, [isLoading]),
+  };
+
+  useKeyboardShortcuts(shortcuts);
 
   // Load conversations on mount
   useEffect(() => {
@@ -25,6 +54,15 @@ function App() {
       loadConversation(currentConversationId);
     }
   }, [currentConversationId]);
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const loadConversations = async () => {
     try {
@@ -64,6 +102,14 @@ function App() {
   const handleSendMessage = async (content) => {
     if (!currentConversationId) return;
 
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController();
+
     setIsLoading(true);
     try {
       // Optimistically add user message to UI
@@ -93,7 +139,7 @@ function App() {
         messages: [...prev.messages, assistantMessage],
       }));
 
-      // Send message with streaming (pass selected strategy)
+      // Send message with streaming (pass selected strategy and abort signal)
       await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
@@ -173,8 +219,13 @@ function App() {
           default:
             console.log('Unknown event type:', eventType);
         }
-      }, selectedStrategy, {});
+      }, selectedStrategy, {}, abortControllerRef.current.signal);
     } catch (error) {
+      // Don't show error if request was cancelled
+      if (error.name === 'AbortError') {
+        console.log('Request was cancelled');
+        return;
+      }
       console.error('Failed to send message:', error);
       // Remove optimistic messages on error
       setCurrentConversation((prev) => ({
@@ -186,33 +237,38 @@ function App() {
   };
 
   return (
-    <div className="app">
-      <Sidebar
-        conversations={conversations}
-        currentConversationId={currentConversationId}
-        onSelectConversation={handleSelectConversation}
-        onNewConversation={handleNewConversation}
-        onShowAnalytics={() => setShowAnalytics(true)}
-      />
-      <div className="main-content">
-        <StrategySelector
-          selectedStrategy={selectedStrategy}
-          onStrategyChange={setSelectedStrategy}
+    <ErrorBoundary>
+      <div className="app">
+        <Sidebar
+          conversations={conversations}
+          currentConversationId={currentConversationId}
+          onSelectConversation={handleSelectConversation}
+          onNewConversation={handleNewConversation}
+          onShowAnalytics={() => setShowAnalytics(true)}
         />
-        <ChatInterface
-          conversation={currentConversation}
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-          selectedStrategy={selectedStrategy}
-          onStrategyChange={setSelectedStrategy}
-        />
-      </div>
+        <div className="main-content">
+          <div className="main-header">
+            <StrategySelector
+              selectedStrategy={selectedStrategy}
+              onStrategyChange={setSelectedStrategy}
+            />
+            <ThemeToggle />
+          </div>
+          <ChatInterface
+            conversation={currentConversation}
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+            selectedStrategy={selectedStrategy}
+            onStrategyChange={setSelectedStrategy}
+          />
+        </div>
 
-      {/* Analytics Dashboard Modal */}
-      {showAnalytics && (
-        <AnalyticsDashboard onClose={() => setShowAnalytics(false)} />
-      )}
-    </div>
+        {/* Analytics Dashboard Modal */}
+        {showAnalytics && (
+          <AnalyticsDashboard onClose={() => setShowAnalytics(false)} />
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }
 
