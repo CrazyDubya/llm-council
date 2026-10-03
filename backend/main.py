@@ -20,6 +20,7 @@ from .query_classifier import QueryClassifier
 from .websocket import connection_manager
 from .openrouter import query_model_with_streaming
 from .cache import get_cache, start_cleanup_task
+from . import time_travel, fact_checking, model_management
 
 # Configure logging
 logging.basicConfig(
@@ -604,6 +605,158 @@ async def websocket_endpoint(websocket: WebSocket, conversation_id: str):
         logger.error(f"WebSocket error: {e}", exc_info=True)
     finally:
         await connection_manager.disconnect(websocket, conversation_id)
+
+
+
+class CreateBenchmarkRequest(BaseModel):
+    conversation_id: str
+    message_index: int
+
+
+class RerunBenchmarkRequest(BaseModel):
+    models: List[str]
+    chairman: str
+    strategy: str = "simple"
+
+
+class AnalyzeResponseRequest(BaseModel):
+    text: str
+
+
+class CrossReferenceRequest(BaseModel):
+    responses: List[Dict[str, str]]
+
+
+class EstimateCostRequest(BaseModel):
+    model_ids: List[str]
+    avg_prompt_tokens: int = 1000
+    avg_completion_tokens: int = 500
+    num_calls: int = 1
+
+
+class RecommendCouncilRequest(BaseModel):
+    budget: float = None
+    diversity: bool = True
+    include_reasoning: bool = False
+
+
+@app.post("/api/benchmarks")
+async def create_benchmark(request: CreateBenchmarkRequest):
+    """Create a benchmark snapshot from a conversation response."""
+    try:
+        conv = storage.get_conversation(request.conversation_id)
+        if not conv:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        if request.message_index >= len(conv["messages"]):
+            raise HTTPException(status_code=400, detail="Invalid message index")
+        message = conv["messages"][request.message_index]
+        if message["role"] != "assistant":
+            raise HTTPException(status_code=400, detail="Can only benchmark assistant messages")
+        snapshot_id = time_travel.create_benchmark_snapshot(
+            request.conversation_id,
+            request.message_index,
+            {
+                "stage1": message.get("stage1"),
+                "stage2": message.get("stage2"),
+                "stage3": message.get("stage3"),
+                "metadata": message.get("metadata"),
+            },
+        )
+        return {"status": "success", "snapshot_id": snapshot_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/benchmarks")
+async def list_benchmarks():
+    return {"benchmarks": time_travel.list_benchmarks()}
+
+
+@app.get("/api/benchmarks/{snapshot_id}")
+async def get_benchmark(snapshot_id: str):
+    benchmark = time_travel.get_benchmark(snapshot_id)
+    if not benchmark:
+        raise HTTPException(status_code=404, detail="Benchmark not found")
+    return benchmark
+
+
+@app.post("/api/benchmarks/{snapshot_id}/rerun")
+async def rerun_benchmark(snapshot_id: str, request: RerunBenchmarkRequest):
+    try:
+        return await time_travel.rerun_benchmark(
+            snapshot_id, request.models, request.chairman, request.strategy
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/fact-check/citations")
+async def extract_citations_endpoint(request: AnalyzeResponseRequest):
+    citations = fact_checking.extract_citations(request.text)
+    return {"citations": citations, "count": len(citations)}
+
+
+@app.post("/api/fact-check/claims")
+async def extract_claims_endpoint(request: AnalyzeResponseRequest):
+    claims = fact_checking.extract_claims(request.text)
+    numerical_claims = fact_checking.extract_numerical_claims(request.text)
+    return {
+        "claims": claims,
+        "numerical_claims": numerical_claims,
+        "total_claims": len(claims) + len(numerical_claims),
+    }
+
+
+@app.post("/api/fact-check/cross-reference")
+async def cross_reference_endpoint(request: CrossReferenceRequest):
+    return fact_checking.cross_reference_validate(request.responses)
+
+
+@app.get("/api/models")
+async def list_models(
+    category: str = None,
+    min_context: int = None,
+    max_cost: float = None,
+    search: str = None,
+):
+    models = await model_management.fetch_available_models()
+    if any([category, min_context, max_cost, search]):
+        models = model_management.filter_models(
+            models,
+            category=category,
+            min_context=min_context,
+            max_cost=max_cost,
+            search=search,
+        )
+    return {"models": models, "count": len(models)}
+
+
+@app.post("/api/models/estimate-cost")
+async def estimate_cost_endpoint(request: EstimateCostRequest):
+    return model_management.estimate_cost(
+        request.model_ids,
+        request.avg_prompt_tokens,
+        request.avg_completion_tokens,
+        request.num_calls,
+    )
+
+
+@app.post("/api/models/recommend-council")
+async def recommend_council_endpoint(request: RecommendCouncilRequest):
+    recommendations = model_management.recommend_council(
+        budget=request.budget,
+        diversity=request.diversity,
+        include_reasoning=request.include_reasoning,
+    )
+    return {"recommended_models": recommendations}
+
+
+@app.get("/api/models/{model_id:path}")
+async def get_model_info_endpoint(model_id: str):
+    model_info = model_management.get_model_info(model_id)
+    if not model_info:
+        raise HTTPException(status_code=404, detail="Model not found")
+    return model_info
 
 
 if __name__ == "__main__":

@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
 import StrategySelector from './components/StrategySelector';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import ModelBrowser from './components/ModelBrowser';
+import TimeTravelComparison from './components/TimeTravelComparison';
 import ErrorBoundary from './components/ErrorBoundary';
 import ThemeToggle from './components/ThemeToggle';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -16,6 +18,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState('simple');
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showModelBrowser, setShowModelBrowser] = useState(false);
+  const [showTimeTravel, setShowTimeTravel] = useState(false);
 
   // Ref for AbortController to cancel in-flight requests
   const abortControllerRef = useRef(null);
@@ -245,6 +249,8 @@ function App() {
           onSelectConversation={handleSelectConversation}
           onNewConversation={handleNewConversation}
           onShowAnalytics={() => setShowAnalytics(true)}
+          onShowModelBrowser={() => setShowModelBrowser(true)}
+          onShowTimeTravel={() => setShowTimeTravel(true)}
         />
         <div className="main-content">
           <div className="main-header">
@@ -266,6 +272,12 @@ function App() {
         {/* Analytics Dashboard Modal */}
         {showAnalytics && (
           <AnalyticsDashboard onClose={() => setShowAnalytics(false)} />
+        )}
+        {showModelBrowser && (
+          <ModelBrowser onClose={() => setShowModelBrowser(false)} />
+        )}
+        {showTimeTravel && (
+          <TimeTravelComparison onClose={() => setShowTimeTravel(false)} />
         )}
       </div>
     </ErrorBoundary>

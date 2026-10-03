@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import CopyButton from './CopyButton';
+import FactCheckBadges from './FactCheckBadges';
 import { api } from '../api';
 import './Stage3.css';
 
@@ -8,7 +9,8 @@ export default function Stage3({
   finalResponse,
   conversationId,
   messageIndex,
-  currentFeedback
+  currentFeedback,
+  stage1Responses
 }) {
   const [feedback, setFeedback] = useState(currentFeedback);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,6 +48,11 @@ export default function Stage3({
         <div className="final-text markdown-content">
           <ReactMarkdown>{finalResponse.response}</ReactMarkdown>
         </div>
+
+        <FactCheckBadges
+          text={finalResponse.response}
+          responses={stage1Responses}
+        />
 
         {/* Feedback buttons */}
         {conversationId && messageIndex !== undefined && (

@@ -115,6 +115,11 @@ class SimpleRankingStrategy(EnsembleStrategy):
             "aggregate_rankings": aggregate_rankings,
             "strategy": "simple"
         }
+        try:
+            from ..consensus import build_consensus_map
+            metadata["consensus_map"] = await build_consensus_map(stage1_results)
+        except Exception:
+            logger.warning("Consensus map unavailable", exc_info=True)
 
         result = {
             'stage1': stage1_results,

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import CopyButton from './CopyButton';
+import ConsensusMap from './ConsensusMap';
 import './Stage1.css';
 
-export default function Stage1({ responses }) {
+export default function Stage1({ responses, metadata }) {
   const [activeTab, setActiveTab] = useState(0);
 
   if (!responses || responses.length === 0) {
@@ -37,6 +38,9 @@ export default function Stage1({ responses }) {
           <ReactMarkdown>{activeResponse.response}</ReactMarkdown>
         </div>
       </div>
+      {metadata?.consensus_map && (
+        <ConsensusMap consensusMap={metadata.consensus_map} />
+      )}
     </div>
   );
 }

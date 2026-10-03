@@ -27,6 +27,8 @@ export default function Sidebar({
   onSelectConversation,
   onNewConversation,
   onShowAnalytics,
+  onShowModelBrowser,
+  onShowTimeTravel,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -55,6 +57,18 @@ export default function Sidebar({
               <line x1="18" y1="20" x2="18" y2="10" />
               <line x1="12" y1="20" x2="12" y2="4" />
               <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+          </button>
+          <button className="analytics-btn" onClick={onShowModelBrowser} title="Model Browser">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+              <path d="M9 9h6v6H9z" />
+            </svg>
+          </button>
+          <button className="analytics-btn" onClick={onShowTimeTravel} title="Time-Travel Benchmarks">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v6l4 2" />
             </svg>
           </button>
           <button className="new-conversation-btn" onClick={onNewConversation} title="New Conversation (Ctrl+N)">
